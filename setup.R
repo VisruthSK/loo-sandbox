@@ -20,5 +20,7 @@ loo2 <- loo(fit2, save_psis = TRUE)
 
 loo_compare(loo1, loo2)
 
+# code from https://mc-stan.org/loo/articles/loo2-example.html
+
 saveRDS(loo1, "loo1.RDS")
 saveRDS(loo2, "loo2.RDS")
