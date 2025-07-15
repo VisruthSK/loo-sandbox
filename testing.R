@@ -1,5 +1,4 @@
 library(loo)
-options(mc.cores = 4)
 
 loo1 <- readRDS("loo1.RDS")
 loo2 <- readRDS("loo2.RDS")
@@ -13,8 +12,34 @@ new_loo1 <- loo1[1:3]
 
 str(new_loo1)
 
-add_measure <- function(my_loo, y, ypred, measure=c("RPS", "SRPS", "CRPS", "SCRPS", "mae", "rmse", "mse", "R2", "acc", "balanced_acc"){
+add_measure <- function(
+  my_loo,
+  y,
+  ypred,
+  measure = c(
+    "RPS",
+    "SRPS",
+    "CRPS",
+    "SCRPS",
+    "mae",
+    "rmse",
+    "mse",
+    "R2",
+    "acc",
+    "balanced_acc"
+  )
+) {
   measure <- match.arg(measure)
   # dispatch on measure to calculate new results
   # measure funcs should return vector: estimate, SE
 }
+
+ptwisemtrx <- loo1$pointwise
+class(ptwisemtrx)
+
+library(lobstr)
+obj_size(ptwisemtrx)
+
+ptwisedf <- as.data.frame(ptwisemtrx)
+obj_size(ptwisedf)
+obj_addrs(ptwisedf)
