@@ -48,7 +48,7 @@ loo_pred_measure.matrix <- function(
   predictive_measure_func(observed, predicted)
 }
 
-# ----------------------------- Internals -----------------------------
+# ----------------------------- Metrics -----------------------------
 
 #' Select predictive measure function based on user's `measure` argument
 #'
@@ -71,21 +71,36 @@ loo_pred_measure.matrix <- function(
 }
 
 #' @param y A vector of observed values
-#' @param yhat A vector of predictions
+#' @param yhat A matrix of posterior draws
 #'
 #' @keywords internal
 #' @name .metric_common_params
 NULL
+
+
+.lpnorm <- function(y, yhat, penaltyFunc) {
+  n <- length(y)
+  stopifnot(is.numeric(y), is.matrix(yhat), ncol(yhat) == n)
+  mu <- colMeans(yhat)
+  pointwise <- penaltyFunc(y - mu)
+  est <- mean(pointwise)
+  se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
+  list(estimate = est, se = se, pointwise = pointwise)
+}
 
 #' Mean absolute error
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
 .mae <- function(y, yhat) {
-  n <- length(y)
-  stopifnot(n == length(yhat))
-  e <- abs(y - yhat)
-  list(estimate = mean(e), se = sd(e) / sqrt(n), pointwise = e)
+  .lpnorm(y, yhat, abs)
+  # n <- length(y)
+  # stopifnot(is.numeric(y), is.matrix(yhat), ncol(yhat) == n)
+  # mu <- colMeans(yhat)
+  # pointwise <- abs(y - mu)
+  # est <- mean(pointwise)
+  # se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
+  # list(estimate = est, se = se, pointwise = pointwise)
 }
 
 #' Mean squared error
@@ -93,10 +108,14 @@ NULL
 #' @noRd
 #' @inheritParams .metric_common_params
 .mse <- function(y, yhat) {
-  n <- length(y)
-  stopifnot(n == length(yhat))
-  e <- (y - yhat)^2
-  list(estimate = mean(e), se = sd(e) / sqrt(n), pointwise = e)
+  .lpnorm(y, yhat, \(x) x^2)
+  # n <- length(y)
+  # stopifnot(is.numeric(y), is.matrix(yhat), ncol(yhat) == n)
+  # mu <- colMeans(yhat)
+  # pointwise <- (y - mu)^2
+  # est <- mean(pointwise)
+  # se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
+  # list(estimate = est, se = se, pointwise = pointwise)
 }
 # TODO: maybe memoize?
 
@@ -151,22 +170,47 @@ NULL
   )
 }
 
+#' Log score
+#'
+#' @noRd
+#' @param ylp Numeric vector of pointwise LOO log predictive densities.
+.logscore <- function(y, ylp) {
+  n <- length(y)
+  stopifnot(is.numeric(ylp), length(ylp) == n)
+  est <- mean(ylp)
+  se <- sqrt(n / (n - 1) * sum((ylp - est)^2))
+  list(estimate = est, se = se, pointwise = ylp)
+}
+
+#' Expected log-predictive density
+#'
+#' @noRd
+#' @param ylp Numeric vector of pointwise LOO log predictive densities.
+.elpd <- function(y, ylp) {
+  n <- length(y)
+  stopifnot(is.numeric(ylp), length(ylp) == n)
+  est <- sum(ylp)
+  se <- sqrt(n / (n - 1) * sum((ylp - mean(ylp))^2))
+  list(estimate = est, se = se, pointwise = ylp)
+}
+
 #' Classification accuracy
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
 .accuracy <- function(y, yhat) {
   n <- length(y)
-  stopifnot(
-    n == length(yhat),
-    all(y <= 1 & y >= 0),
-    all(yhat <= 1 & yhat >= 0)
+  stopifnot(is.matrix(yhat), ncol(yhat) == n)
+  pointwise <- vapply(
+    seq_len(n),
+    \(j) mean(yhat[, j] == y[j]),
+    numeric(1)
   )
-  yhat <- as.integer(yhat > 0.5)
-  acc <- as.integer(yhat == y)
-  est <- mean(acc)
-  list(estimate = est, se = sqrt(est * (1 - est) / n))
+  est <- mean(pointwise)
+  se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
+  list(estimate = est, se = se, pointwise = pointwise)
 }
+
 
 #' Balanced classification accuracy
 #'
@@ -174,22 +218,18 @@ NULL
 #' @inheritParams .metric_common_params
 .balanced_accuracy <- function(y, yhat) {
   n <- length(y)
-  stopifnot(
-    length(yhat) == n,
-    all(y <= 1 & y >= 0),
-    all(yhat <= 1 & yhat >= 0)
-  )
-  yhat <- as.integer(yhat > 0.5)
-  mask <- y == 0
-
-  tn <- mean(yhat[mask] == y[mask]) # True negatives
-  tp <- mean(yhat[!mask] == y[!mask]) # True positives
-
-  bls_acc <- (tp + tn) / 2
-  # This approximation has quite large bias for small samples
-  bls_acc_var <- (tp * (1 - tp) + tn * (1 - tn)) / 4
-  list(estimate = bls_acc, se = sqrt(bls_acc_var / n))
+  stopifnot(is.matrix(yhat), ncol(yhat) == n)
+  r <- vapply(seq_len(n), function(j) mean(yhat[, j] == y[j]), numeric(1))
+  classes <- unique(y)
+  recalls <- vapply(classes, function(cl) mean(r[y == cl]), numeric(1))
+  names(recalls) <- as.character(classes)
+  C <- length(recalls)
+  est <- mean(recalls)
+  se <- if (C > 1) sqrt(sum((recalls - est)^2) / (C * (C - 1))) else 0
+  list(estimate = est, se = se, pointwise = recalls)
 }
+
+# ----------------------------- Scores -------------------------------
 
 #' (Continuous) Ranked Probability Score
 #'
@@ -256,9 +296,14 @@ NULL
 #'   to Ensemble Weather Forecasts. \emph{Mathematical Geosciences},
 #'   50, 209–234.
 #' }
+#' @noRd
+#' @param y A vector of observed values
+#' @param ypred Predictive draws matrix
+#' @param w Optional nonnegative weights for draws
+#' @param scaled logical, defaults to false. If true, computes SRPS/SCRPS
 .rps <- function(y, yhat, w = NULL, scaled = FALSE) {
   n <- length(y)
-  stopifnot(n == ncol(yhat))
+  stopifnot(ncol(yhat) == n)
 
   pointwise <- vapply(
     seq_len(n),
