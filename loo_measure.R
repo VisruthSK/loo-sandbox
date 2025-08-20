@@ -129,6 +129,7 @@ NULL
   .l12norm(y, yhat, weights, function(x) x^2)
 }
 # TODO: maybe memoize?
+# TODO: maybe this should be in a closure to share env with .rmse and .r2 so `.mse(y, yhat, weights)` is only calculated once on those?
 
 #' Root mean squared error
 #'
@@ -166,7 +167,6 @@ NULL
   mse_y <- mse_y_res$estimate
   mse_y_pointwise <- mse_y_res$pointwise
 
-  # TODO: Could you please check this Aki
   se_r2 <- sqrt(
     se_mse_loo^2 -
       2 *
@@ -184,8 +184,6 @@ NULL
   )
 }
 
-
-# TODO: Ask Aki in slack
 #' Classification accuracy
 #'
 #' Assuming values in `yhat` only take on 0 or 1
@@ -193,12 +191,11 @@ NULL
 #' @noRd
 #' @inheritParams .metric_common_params
 .accuracy <- function(y, yhat, weights) {
-  # TODO: check yhat vals are 0, 1
   n <- length(y)
-  stopifnot(is.matrix(yhat), ncol(yhat) == n)
+  stopifnot(is.matrix(yhat), ncol(yhat) == n, all(yhat %in% c(0, 1)))
   pointwise <- vapply(
     seq_len(n),
-    function(j) weighted.mean(yhat[, j] == y[j], weights), # TODO: check if w = NULL is same as missing
+    function(j) .loo_weighted_mean(yhat[, j] == y[j], weights),
     numeric(1)
   ) # TODO: make this weighted--maybe just weightedMean?
   est <- mean(pointwise)
@@ -206,7 +203,6 @@ NULL
   list(estimate = est, se = se, pointwise = pointwise)
 }
 
-# TODO: Check with Aki?
 #' Balanced classification accuracy
 #'
 #' @noRd
@@ -215,7 +211,11 @@ NULL
   # TODO: add weights
   n <- length(y)
   stopifnot(is.matrix(yhat), ncol(yhat) == n)
-  r <- vapply(seq_len(n), function(j) mean(yhat[, j] == y[j]), numeric(1))
+  r <- vapply(
+    seq_len(n),
+    function(j) .loo_weighted_mean(yhat[, j] == y[j], weights),
+    numeric(1)
+  )
   classes <- unique(y)
   recalls <- vapply(classes, function(cl) mean(r[y == cl]), numeric(1))
   names(recalls) <- as.character(classes)
@@ -234,11 +234,15 @@ NULL
 #' @noRd
 #' @param ylp Numeric vector of pointwise LOO log predictive densities.
 .logscore <- function(y, ylp, weights) {
-  n <- length(y)
-  stopifnot(is.numeric(ylp), length(ylp) == n)
-  est <- weighted.mean(ylp, weights) # TODO: check w
-  se <- sqrt(n / (n - 1) * sum((ylp - est)^2)) # TODO: double check
-  list(estimate = est, se = se, pointwise = ylp)
+  w <- if (is.null(weights)) 1 else weights
+  .elpd(y, ylp * w, NULL) |>
+    (\(l) {
+      d <- if (is.null(weights)) length(y) else sum(weights)
+      modifyList(
+        l,
+        list(estimate = l$estimate / d, se = l$se / d)
+      )
+    })()
 }
 
 #' Expected log-predictive density
@@ -248,9 +252,11 @@ NULL
 .elpd <- function(y, ylp, weights) {
   n <- length(y)
   stopifnot(is.numeric(ylp), length(ylp) == n)
-  est <- sum(ylp)
-  se <- sqrt(n / (n - 1) * sum((ylp - mean(ylp))^2))
-  list(estimate = est, se = se, pointwise = ylp)
+  list(
+    estimate = sum(ylp),
+    se = sqrt(n / (n - 1) * sum((ylp - .loo_weighted_mean(ylp, weights))^2)),
+    pointwise = ylp
+  )
 }
 
 #' (Continuous) Ranked Probability Score
@@ -323,12 +329,11 @@ NULL
 #' @param ypred Predictive draws matrix
 #' @param w Optional nonnegative weights for draws
 #' @param scaled logical. If true, computes SRPS/SCRPS
-.rps <- function(y, yhat, w = NULL, scaled = FALSE) {
+.rps <- function(y, yhat, w, scaled) {
   # TODO: move this up to main function
   n <- length(y)
   stopifnot(ncol(yhat) == n)
   # TODO: change w to weight
-  # TODO: no defaults
 
   pointwise <- vapply(
     seq_len(n),
@@ -368,4 +373,19 @@ NULL
     se = sqrt(n / (n - 1) * sum((pointwise - mean(pointwise))^2)),
     pointwise = pointwise
   )
+}
+
+# ----------------------------- Helpers -----------------------------
+
+#' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
+#'
+#' @noRd
+#' @param x vector to take mean of
+#' @param weights optional weights. Set to `NULL` if unweighted mean is desired.
+#' @return The mean of `x`, optionally weighted by `weights` if specified.
+.loo_weighted_mean <- function(x, weights) {
+  if (missing(weights) || is.null(weights)) {
+    weighted.mean(x)
+  }
+  weighted.mean(x, weights)
 }
