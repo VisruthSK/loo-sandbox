@@ -27,25 +27,38 @@ loo_pred_measure.matrix <- function(
   psis_object = NULL,
   save_psis = FALSE
 ) {
-  stopifnot(
-    is.numeric(y),
-    # TODO: check that for scores there are y and ypred and for metrics there are y and mupred
-    (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
-      (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
-  ) # TODO: flesh out checks
+  # stopifnot(
+  #   is.numeric(y),
+  #   # TODO: check that for scores there are y and ypred and for metrics there are y and mupred
+  #   (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
+  #     (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
+  # ) # TODO: flesh out checks
   measure <- match.arg(measure)
-  predictive_measure_func <- .loo_predictive_measure_fun(measure)
+  pred_fun <- .loo_predictive_measure_fun(measure)
 
-  observed <- y
-  predicted <- if (
-    measure %in% c("mae", "rmse", "mse", "acc", "balanced_acc", "r2")
+  if (
+    measure %in%
+      c(
+        "mae",
+        "mse",
+        "rmse",
+        "r2",
+        "acc",
+        "balanced_acc",
+        "rps",
+        "crps",
+        "scrps"
+        # ,"energy"
+      )
   ) {
-    ypred
-  } else {
-    mupred
+    stopifnot(is.matrix(ypred))
+    args <- list(y, ypred)
+  } else if (measure %in% c("elpd", "logscore")) {
+    stopifnot(is.numeric(ylp))
+    args <- list(y, ylp)
   }
 
-  predictive_measure_func(observed, predicted)
+  do.call(pred_fun, args)
 }
 
 # ----------------------------- Metrics -----------------------------
@@ -59,6 +72,8 @@ loo_pred_measure.matrix <- function(
 .loo_predictive_measure_fun <- function(measure) {
   switch(
     measure,
+    "elpd" = .elpd,
+    "logscore" = .logscore,
     "r2" = .r2,
     "mae" = .mae,
     "rmse" = .rmse,
@@ -66,12 +81,14 @@ loo_pred_measure.matrix <- function(
     "acc" = .accuracy,
     "balanced_acc" = .balanced_accuracy,
     "rps" = .rps,
-    "crps" = .rps
+    "crps" = .rps,
+    "scrps" = function(y, yhat) .rps(y, yhat, scaled = TRUE)
+    # , "energy" = .energy
   )
 }
 
 #' @param y A vector of observed values
-#' @param yhat A matrix of posterior draws
+#' @param yhat A matrix of posterior draws (S x n)
 #'
 #' @keywords internal
 #' @name .metric_common_params
@@ -80,7 +97,12 @@ NULL
 
 .lpnorm <- function(y, yhat, penaltyFunc) {
   n <- length(y)
-  stopifnot(is.numeric(y), is.matrix(yhat), ncol(yhat) == n)
+  stopifnot(
+    is.numeric(y),
+    is.matrix(yhat),
+    is.function(penaltyFunc),
+    ncol(yhat) == n
+  )
   mu <- colMeans(yhat)
   pointwise <- penaltyFunc(y - mu)
   est <- mean(pointwise)
@@ -108,7 +130,7 @@ NULL
 #' @noRd
 #' @inheritParams .metric_common_params
 .mse <- function(y, yhat) {
-  .lpnorm(y, yhat, \(x) x^2)
+  .lpnorm(y, yhat, function(x) x^2)
   # n <- length(y)
   # stopifnot(is.numeric(y), is.matrix(yhat), ncol(yhat) == n)
   # mu <- colMeans(yhat)
@@ -170,30 +192,6 @@ NULL
   )
 }
 
-#' Log score
-#'
-#' @noRd
-#' @param ylp Numeric vector of pointwise LOO log predictive densities.
-.logscore <- function(y, ylp) {
-  n <- length(y)
-  stopifnot(is.numeric(ylp), length(ylp) == n)
-  est <- mean(ylp)
-  se <- sqrt(n / (n - 1) * sum((ylp - est)^2))
-  list(estimate = est, se = se, pointwise = ylp)
-}
-
-#' Expected log-predictive density
-#'
-#' @noRd
-#' @param ylp Numeric vector of pointwise LOO log predictive densities.
-.elpd <- function(y, ylp) {
-  n <- length(y)
-  stopifnot(is.numeric(ylp), length(ylp) == n)
-  est <- sum(ylp)
-  se <- sqrt(n / (n - 1) * sum((ylp - mean(ylp))^2))
-  list(estimate = est, se = se, pointwise = ylp)
-}
-
 #' Classification accuracy
 #'
 #' @noRd
@@ -203,7 +201,7 @@ NULL
   stopifnot(is.matrix(yhat), ncol(yhat) == n)
   pointwise <- vapply(
     seq_len(n),
-    \(j) mean(yhat[, j] == y[j]),
+    function(j) mean(yhat[, j] == y[j]),
     numeric(1)
   )
   est <- mean(pointwise)
@@ -230,6 +228,32 @@ NULL
 }
 
 # ----------------------------- Scores -------------------------------
+
+# TODO: .energy
+
+#' Log score
+#'
+#' @noRd
+#' @param ylp Numeric vector of pointwise LOO log predictive densities.
+.logscore <- function(y, ylp) {
+  n <- length(y)
+  stopifnot(is.numeric(ylp), length(ylp) == n)
+  est <- mean(ylp)
+  se <- sqrt(n / (n - 1) * sum((ylp - est)^2))
+  list(estimate = est, se = se, pointwise = ylp)
+}
+
+#' Expected log-predictive density
+#'
+#' @noRd
+#' @param ylp Numeric vector of pointwise LOO log predictive densities.
+.elpd <- function(y, ylp) {
+  n <- length(y)
+  stopifnot(is.numeric(ylp), length(ylp) == n)
+  est <- sum(ylp)
+  se <- sqrt(n / (n - 1) * sum((ylp - mean(ylp))^2))
+  list(estimate = est, se = se, pointwise = ylp)
+}
 
 #' (Continuous) Ranked Probability Score
 #'
