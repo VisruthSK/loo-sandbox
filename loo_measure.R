@@ -3,6 +3,7 @@ loo_pred_measure <- function(x, ...) {
   UseMethod("loo_pred_measure")
 }
 
+# TODO: use `{checkmate}`
 loo_pred_measure.matrix <- function(
   y = NULL,
   ypred = NULL,
@@ -27,12 +28,12 @@ loo_pred_measure.matrix <- function(
   psis_object = NULL,
   save_psis = FALSE
 ) {
-  # stopifnot(
-  #   is.numeric(y),
-  #   # TODO: check that for scores there are y and ypred and for metrics there are y and mupred
-  #   (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
-  #     (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
-  # ) # TODO: flesh out checks
+  stopifnot(
+    is.numeric(y),
+    # TODO: check that for scores there are y and ypred and for metrics there are y and mupred
+    (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
+      (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
+  ) # TODO: flesh out checks
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
 
@@ -74,6 +75,7 @@ loo_pred_measure.matrix <- function(
     measure,
     "elpd" = .elpd,
     "logscore" = .logscore,
+    "mlpd" = .logscore,
     "r2" = .r2,
     "mae" = .mae,
     "rmse" = .rmse,
@@ -89,21 +91,22 @@ loo_pred_measure.matrix <- function(
 
 #' @param y A vector of observed values
 #' @param yhat A matrix of posterior draws (S x n)
+#' @param weights optional weights for calculation of metric. Set to NULL if unweighted
 #'
 #' @keywords internal
 #' @name .metric_common_params
 NULL
 
-
-.lpnorm <- function(y, yhat, penaltyFunc) {
+# TODO: change name
+#` Helper for .mae and .mse
+.l12norm <- function(y, yhat, weights, penaltyFunc) {
   n <- length(y)
   stopifnot(
-    is.numeric(y),
     is.matrix(yhat),
     is.function(penaltyFunc),
     ncol(yhat) == n
   )
-  mu <- colMeans(yhat)
+  mu <- matrixStats::colWeightedMeans(yhat, w = weights)
   pointwise <- penaltyFunc(y - mu)
   est <- mean(pointwise)
   se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
@@ -114,30 +117,16 @@ NULL
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.mae <- function(y, yhat) {
-  .lpnorm(y, yhat, abs)
-  # n <- length(y)
-  # stopifnot(is.numeric(y), is.matrix(yhat), ncol(yhat) == n)
-  # mu <- colMeans(yhat)
-  # pointwise <- abs(y - mu)
-  # est <- mean(pointwise)
-  # se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
-  # list(estimate = est, se = se, pointwise = pointwise)
+.mae <- function(y, yhat, weights) {
+  .l12norm(y, yhat, weights, abs)
 }
 
 #' Mean squared error
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.mse <- function(y, yhat) {
-  .lpnorm(y, yhat, function(x) x^2)
-  # n <- length(y)
-  # stopifnot(is.numeric(y), is.matrix(yhat), ncol(yhat) == n)
-  # mu <- colMeans(yhat)
-  # pointwise <- (y - mu)^2
-  # est <- mean(pointwise)
-  # se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
-  # list(estimate = est, se = se, pointwise = pointwise)
+.mse <- function(y, yhat, weights) {
+  .l12norm(y, yhat, weights, function(x) x^2)
 }
 # TODO: maybe memoize?
 
@@ -145,8 +134,8 @@ NULL
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.rmse <- function(y, yhat) {
-  est <- .mse(y, yhat)
+.rmse <- function(y, yhat, weights) {
+  est <- .mse(y, yhat, weights)
   mean_mse <- est$estimate
   var_mse <- est$se^2
   var_rmse <- var_mse / mean_mse / 4 # Comes from the first order Taylor approx.
@@ -157,15 +146,17 @@ NULL
   )
 }
 
+# TODO: double check stopifnots to see if ncol(yhat) is being compared to length of y instead of length of yhat
+
 #' R^2
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.r2 <- function(y, yhat) {
+.r2 <- function(y, yhat, weights) {
   n <- length(y)
-  stopifnot(length(yhat) == n)
+  stopifnot(is.matrix(yhat), ncol(yhat) == n)
 
-  mse_loo_res <- .mse(y, yhat)
+  mse_loo_res <- .mse(y, yhat, weights)
   mse_loo <- mse_loo_res$estimate
   se_mse_loo <- mse_loo_res$se
   mse_loo_pointwise <- mse_loo_res$pointwise
@@ -175,6 +166,7 @@ NULL
   mse_y <- mse_y_res$estimate
   mse_y_pointwise <- mse_y_res$pointwise
 
+  # TODO: Could you please check this Aki
   se_r2 <- sqrt(
     se_mse_loo^2 -
       2 *
@@ -192,29 +184,35 @@ NULL
   )
 }
 
+
+# TODO: Ask Aki in slack
 #' Classification accuracy
+#'
+#' Assuming values in `yhat` only take on 0 or 1
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.accuracy <- function(y, yhat) {
+.accuracy <- function(y, yhat, weights) {
+  # TODO: check yhat vals are 0, 1
   n <- length(y)
   stopifnot(is.matrix(yhat), ncol(yhat) == n)
   pointwise <- vapply(
     seq_len(n),
-    function(j) mean(yhat[, j] == y[j]),
+    function(j) weighted.mean(yhat[, j] == y[j], weights), # TODO: check if w = NULL is same as missing
     numeric(1)
-  )
+  ) # TODO: make this weighted--maybe just weightedMean?
   est <- mean(pointwise)
   se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
   list(estimate = est, se = se, pointwise = pointwise)
 }
 
-
+# TODO: Check with Aki?
 #' Balanced classification accuracy
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.balanced_accuracy <- function(y, yhat) {
+.balanced_accuracy <- function(y, yhat, weights) {
+  # TODO: add weights
   n <- length(y)
   stopifnot(is.matrix(yhat), ncol(yhat) == n)
   r <- vapply(seq_len(n), function(j) mean(yhat[, j] == y[j]), numeric(1))
@@ -229,17 +227,17 @@ NULL
 
 # ----------------------------- Scores -------------------------------
 
-# TODO: .energy
+# TODO: .energy multivariate CRPS, add later
 
 #' Log score
 #'
 #' @noRd
 #' @param ylp Numeric vector of pointwise LOO log predictive densities.
-.logscore <- function(y, ylp) {
+.logscore <- function(y, ylp, weights) {
   n <- length(y)
   stopifnot(is.numeric(ylp), length(ylp) == n)
-  est <- mean(ylp)
-  se <- sqrt(n / (n - 1) * sum((ylp - est)^2))
+  est <- weighted.mean(ylp, weights) # TODO: check w
+  se <- sqrt(n / (n - 1) * sum((ylp - est)^2)) # TODO: double check
   list(estimate = est, se = se, pointwise = ylp)
 }
 
@@ -247,7 +245,7 @@ NULL
 #'
 #' @noRd
 #' @param ylp Numeric vector of pointwise LOO log predictive densities.
-.elpd <- function(y, ylp) {
+.elpd <- function(y, ylp, weights) {
   n <- length(y)
   stopifnot(is.numeric(ylp), length(ylp) == n)
   est <- sum(ylp)
@@ -324,10 +322,13 @@ NULL
 #' @param y A vector of observed values
 #' @param ypred Predictive draws matrix
 #' @param w Optional nonnegative weights for draws
-#' @param scaled logical, defaults to false. If true, computes SRPS/SCRPS
+#' @param scaled logical. If true, computes SRPS/SCRPS
 .rps <- function(y, yhat, w = NULL, scaled = FALSE) {
+  # TODO: move this up to main function
   n <- length(y)
   stopifnot(ncol(yhat) == n)
+  # TODO: change w to weight
+  # TODO: no defaults
 
   pointwise <- vapply(
     seq_len(n),
