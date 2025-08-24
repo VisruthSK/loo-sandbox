@@ -1,15 +1,17 @@
+library(checkmate)
+
 # TODO: write documentation
 loo_pred_measure <- function(x, ...) {
   UseMethod("loo_pred_measure")
 }
 
-# TODO: use `{checkmate}`
 loo_pred_measure.matrix <- function(
   y = NULL,
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
   loo = NULL,
+  weights = NULL,
   measure = c(
     "logscore",
     "elpd",
@@ -52,14 +54,17 @@ loo_pred_measure.matrix <- function(
         # ,"energy"
       )
   ) {
-    stopifnot(is.matrix(ypred))
+    assert_matrix(ypred, ncols = length(y))
     args <- list(y, ypred)
   } else if (measure %in% c("elpd", "logscore")) {
-    stopifnot(is.numeric(ylp))
+    assert_numeric(ylp, len = length(y))
     args <- list(y, ylp)
   }
 
-  do.call(pred_fun, args)
+  # TODO: check if weights is correct length or null
+  assert_numeric(weights, len = length(y))
+
+  do.call(pred_fun, append(args, weights))
 }
 
 # ----------------------------- Metrics -----------------------------
@@ -100,17 +105,16 @@ NULL
 # TODO: change name
 #` Helper for .mae and .mse
 .l12norm <- function(y, yhat, weights, penaltyFunc) {
-  n <- length(y)
-  stopifnot(
-    is.matrix(yhat),
-    is.function(penaltyFunc),
-    ncol(yhat) == n
-  )
-  mu <- matrixStats::colWeightedMeans(yhat, w = weights)
-  pointwise <- penaltyFunc(y - mu)
+  assert_function(penaltyFunc)
   est <- mean(pointwise)
-  se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
-  list(estimate = est, se = se, pointwise = pointwise)
+  pointwise <- penaltyFunc(
+    y - matrixStats::colWeightedMeans(yhat, w = weights)
+  )
+  list(
+    estimate = est,
+    se = .se_helper(pointwise, est, length(y)),
+    pointwise = pointwise
+  )
 }
 
 #' Mean absolute error
@@ -130,6 +134,7 @@ NULL
 }
 # TODO: maybe memoize?
 # TODO: maybe this should be in a closure to share env with .rmse and .r2 so `.mse(y, yhat, weights)` is only calculated once on those?
+# do.call() and pass around env?
 
 #' Root mean squared error
 #'
@@ -147,15 +152,12 @@ NULL
   )
 }
 
-# TODO: double check stopifnots to see if ncol(yhat) is being compared to length of y instead of length of yhat
-
 #' R^2
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
 .r2 <- function(y, yhat, weights) {
   n <- length(y)
-  stopifnot(is.matrix(yhat), ncol(yhat) == n)
 
   mse_loo_res <- .mse(y, yhat, weights)
   mse_loo <- mse_loo_res$estimate
@@ -165,15 +167,15 @@ NULL
   ybar <- mean(y)
   mse_y_res <- .mse(y, rep(ybar, n))
   mse_y <- mse_y_res$estimate
-  mse_y_pointwise <- mse_y_res$pointwise
+  squared_error_y_pointwise <- mse_y_res$pointwise
 
   se_r2 <- sqrt(
     se_mse_loo^2 -
       2 *
         (mse_loo / mse_y) *
-        cov(mse_loo_pointwise, mse_y_pointwise) /
+        cov(mse_loo_pointwise, squared_error_y_pointwise) /
         n +
-      (mse_loo^2 / mse_y^2) * var(mse_y_pointwise) / n
+      (mse_loo^2 / mse_y^2) * var(squared_error_y_pointwise) / n
   ) /
     mse_y
 
@@ -191,16 +193,19 @@ NULL
 #' @noRd
 #' @inheritParams .metric_common_params
 .accuracy <- function(y, yhat, weights) {
+  assert_subset(yhat, choices = c(0, 1))
   n <- length(y)
-  stopifnot(is.matrix(yhat), ncol(yhat) == n, all(yhat %in% c(0, 1)))
   pointwise <- vapply(
     seq_len(n),
     function(j) .loo_weighted_mean(yhat[, j] == y[j], weights),
     numeric(1)
-  ) # TODO: make this weighted--maybe just weightedMean?
+  )
   est <- mean(pointwise)
-  se <- sqrt(sum((pointwise - est)^2) / (n * (n - 1)))
-  list(estimate = est, se = se, pointwise = pointwise)
+  list(
+    estimate = est,
+    se = .se_helper(pointwise, est, n),
+    pointwise = pointwise
+  )
 }
 
 #' Balanced classification accuracy
@@ -208,9 +213,8 @@ NULL
 #' @noRd
 #' @inheritParams .metric_common_params
 .balanced_accuracy <- function(y, yhat, weights) {
-  # TODO: add weights
+  # TODO: check if weights are correctly used
   n <- length(y)
-  stopifnot(is.matrix(yhat), ncol(yhat) == n)
   r <- vapply(
     seq_len(n),
     function(j) .loo_weighted_mean(yhat[, j] == y[j], weights),
@@ -221,8 +225,11 @@ NULL
   names(recalls) <- as.character(classes)
   C <- length(recalls)
   est <- mean(recalls)
-  se <- if (C > 1) sqrt(sum((recalls - est)^2) / (C * (C - 1))) else 0
-  list(estimate = est, se = se, pointwise = recalls)
+  list(
+    estimate = est,
+    se = if (C > 1) .se_helper(recalls, est, C) else 0,
+    pointwise = recalls
+  )
 }
 
 # ----------------------------- Scores -------------------------------
@@ -251,7 +258,6 @@ NULL
 #' @param ylp Numeric vector of pointwise LOO log predictive densities.
 .elpd <- function(y, ylp, weights) {
   n <- length(y)
-  stopifnot(is.numeric(ylp), length(ylp) == n)
   list(
     estimate = sum(ylp),
     se = sqrt(n / (n - 1) * sum((ylp - .loo_weighted_mean(ylp, weights))^2)),
@@ -329,11 +335,8 @@ NULL
 #' @param ypred Predictive draws matrix
 #' @param w Optional nonnegative weights for draws
 #' @param scaled logical. If true, computes SRPS/SCRPS
-.rps <- function(y, yhat, w, scaled) {
-  # TODO: move this up to main function
+.rps <- function(y, yhat, weight, scaled) {
   n <- length(y)
-  stopifnot(ncol(yhat) == n)
-  # TODO: change w to weight
 
   pointwise <- vapply(
     seq_len(n),
@@ -341,19 +344,19 @@ NULL
       x <- yhat[, i]
       obs <- y[i]
 
-      if (is.null(w)) {
+      if (is.null(weight)) {
         EXy <- mean(abs(x - obs))
         x <- sort(x)
         n_draws <- length(x)
         EXX <- -2 * mean(x - 2 * x * (0:(n_draws - 1)) / (n_draws - 1))
       } else {
-        EXy <- sum(w * abs(x - obs))
+        EXy <- sum(weight * abs(x - obs))
         ord <- order(x)
         x <- x[ord]
-        w <- w[ord]
-        cw <- cumsum(w)
-        cw <- (cw - w) / (1 - w)
-        EXX <- -2 * sum(w * (x - 2 * x * cw))
+        weight <- weight[ord]
+        cumulative_weight <- cumsum(weight)
+        cumulative_weight <- (cumulative_weight - weight) / (1 - weight)
+        EXX <- -2 * sum(weight * (x - 2 * x * cumulative_weight))
       }
 
       if (!scaled) {
@@ -388,4 +391,8 @@ NULL
     weighted.mean(x)
   }
   weighted.mean(x, weights)
+}
+
+.se_helper <- function(x, x_mean, n) {
+  sqrt(sum((x - x_mean)^2) / (n * (n - 1)))
 }
