@@ -262,16 +262,17 @@ NULL
 #' @noRd
 #' @inheritParams .summary_metric_common_params
 .balanced_accuracy_summary <- function(y, yhat, loo_weights) {
+  n <- length(y)
   cls_counts <- table(y)
+
   .simple_pointwise_summary(
     vapply(
       seq_len(n),
       function(i) .balanced_accuracy(y[i], yhat[, i], loo_weights),
       numeric(1)
     ) *
-      length(y) /
-      length(cls_counts) /
-      as.numeric(cls_counts[as.character(y)])
+      n /
+      (length(cls_counts) * as.numeric(cls_counts[match(y, names(cls_counts))]))
   )
 }
 
