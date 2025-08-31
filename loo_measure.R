@@ -415,7 +415,7 @@ NULL
 #' @param ypred Predictive draws matrix
 #' @param loo_weights Optional nonnegative loo_weightss for draws
 #' @param scaled logical. If true, computes SRPS/SCRPS
-.rps <- function(y, yhat, loo_weights, scaled) {
+.rps_summary <- function(y, yhat, loo_weights, scaled) {
   n <- length(y)
 
   pointwise <- vapply(
@@ -458,3 +458,4 @@ NULL
     pointwise = pointwise
   )
 }
+
