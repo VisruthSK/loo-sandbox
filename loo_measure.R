@@ -67,7 +67,7 @@ loo_pred_measure.matrix <- function(
   do.call(pred_fun, append(args, weights))
 }
 
-# ----------------------------- Metrics -----------------------------
+# ----------------------------- Measures -----------------------------
 
 #' Select predictive measure function based on user's `measure` argument
 #'
@@ -82,7 +82,7 @@ loo_pred_measure.matrix <- function(
     "logscore" = .logscore,
     "mlpd" = .logscore,
     "r2" = .r2,
-    "mae" = .mae,
+    "mae" = .pointwise_absolute_error,
     "rmse" = .rmse,
     "mse" = .mse,
     "acc" = .accuracy,
@@ -92,6 +92,29 @@ loo_pred_measure.matrix <- function(
     "scrps" = function(y, yhat) .rps(y, yhat, scaled = TRUE)
     # , "energy" = .energy
   )
+}
+
+.match_pointwise_function <- function(measure) {
+  switch(
+    measure,
+    "elpd" = .elpd,
+    "logscore" = .logscore,
+    "mlpd" = .logscore,
+    "r2" = .pointwise_squared_error,
+    "mae" = .pointwise_absolute_error,
+    "rmse" = .pointwise_squared_error,
+    "mse" = .pointwise_squared_error,
+    "acc" = .pointwise_accuracy,
+    "balanced_acc" = .pointwise_accuracy,
+    "rps" = .rps,
+    "crps" = .rps,
+    "scrps" = .rps,
+  )
+  # TODO: fix this
+}
+
+.match_summary_function <- function(measure) {
+  # TODO: write this
 }
 
 #' @param y A scalar, leave one out value
@@ -110,12 +133,20 @@ NULL
 #' @name .summary_metric_common_params
 NULL
 
-#' Mean absolute error
+#' Pointwise absolute error
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.mae <- function(y, yhat, loo_weights) {
+.pointwise_absolute_error <- function(y, yhat, loo_weights) {
   abs(y - .loo_weighted_mean(yhat, loo_weights))
+}
+
+#' Pointwise squared error
+#'
+#' @noRd
+#' @inheritParams .metric_common_params
+.pointwise_squared_error <- function(y, yhat, loo_weights) {
+  (y - .loo_weighted_mean(yhat, loo_weights))^2
 }
 
 #' Mean absolute error
@@ -125,17 +156,9 @@ NULL
 .mae_summary <- function(y, yhat, loo_weights) {
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .mae(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_absolute_error(y[i], yhat[, i], loo_weights),
     numeric(1)
   ))
-}
-
-#' Mean squared error
-#'
-#' @noRd
-#' @inheritParams .metric_common_params
-.mse <- function(y, yhat, loo_weights) {
-  (y - .loo_weighted_mean(yhat, loo_weights))^2
 }
 
 #' Mean squared error
@@ -145,7 +168,7 @@ NULL
 .mse_summary <- function(y, yhat, loo_weights) {
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .mse(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights),
     numeric(1)
   ))
 }
@@ -157,20 +180,12 @@ NULL
 #' Root mean squared error
 #'
 #' @noRd
-#' @inheritParams .metric_common_params
-.rmse <- function(y, yhat, loo_weights) {
-  .mse(y, yhat, loo_weights)
-}
-
-#' Root mean squared error
-#'
-#' @noRd
 #' @inheritParams .summary_metric_common_params
 .rmse_summary <- function(y, yhat, loo_weights) {
   n <- length(y)
   sq <- vapply(
     seq_len(n),
-    function(i) .rmse(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights),
     numeric(1)
   )^2
   mean_mse <- mean(sq)
@@ -184,21 +199,13 @@ NULL
 #' R^2
 #'
 #' @noRd
-#' @inheritParams .metric_common_params
-.r2 <- function(y, yhat, loo_weights) {
-  .mse(y, yhat, loo_weights)
-}
-
-#' R^2
-#'
-#' @noRd
 #' @inheritParams .summary_metric_common_params
 .r2_summary <- function(y, yhat, loo_weights) {
   n <- length(y)
 
   mse_loo_pointwise <- vapply(
     seq_len(n),
-    function(i) .r2(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights),
     numeric(1)
   )
   mse_loo <- mean(mse_loo_pointwise)
@@ -228,7 +235,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams .metric_common_params
-.accuracy <- function(y, yhat, loo_weights) {
+.pointwise_accuracy <- function(y, yhat, loo_weights) {
   .loo_weighted_mean(yhat == y, loo_weights)
 }
 
@@ -242,19 +249,9 @@ NULL
   assert_subset(yhat, choices = c(0, 1))
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .accuracy(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_accuracy(y[i], yhat[, i], loo_weights),
     numeric(1)
   ))
-}
-
-# TODO: write summaries
-
-#' Balanced classification accuracy
-#'
-#' @noRd
-#' @inheritParams .metric_common_params
-.balanced_accuracy <- function(y, yhat, loo_weights) {
-  .accuracy(y, yhat, loo_weights)
 }
 
 #' Balanced classification accuracy
@@ -268,15 +265,21 @@ NULL
   .simple_pointwise_summary(
     vapply(
       seq_len(n),
-      function(i) .balanced_accuracy(y[i], yhat[, i], loo_weights),
+      function(i) .pointwise_accuracy(y[i], yhat[, i], loo_weights),
       numeric(1)
     ) *
       n /
       (length(cls_counts) * as.numeric(cls_counts[match(y, names(cls_counts))]))
   )
 }
+# TODO: check again
 
 # ----------------------------- Scores -------------------------------
+
+# TODO: change measures to compute pointwise; summarize elsewhere
+# https://github.com/stan-dev/loo/blob/master/R/E_loo.R#L260
+# https://github.com/stan-dev/loo/blob/master/R/helpers.R#L36
+# https://github.com/stan-dev/loo/blob/master/R/loo.R#L427
 
 # TODO: .energy multivariate CRPS, add later
 
@@ -310,11 +313,6 @@ NULL
     pointwise = ylp
   )
 }
-
-# TODO: change measures to compute pointwise; summarize elsewhere
-# https://github.com/stan-dev/loo/blob/master/R/E_loo.R#L260
-# https://github.com/stan-dev/loo/blob/master/R/helpers.R#L36
-# https://github.com/stan-dev/loo/blob/master/R/loo.R#L427
 
 #' CRPS
 #'
@@ -424,11 +422,7 @@ NULL
     FUN.VALUE = numeric(1)
   )
 
-  list(
-    estimate = mean(pointwise),
-    se = .se_helper(pointwise, mean(pointwise), n),
-    pointwise = pointwise
-  )
+  .simple_pointwise_summary(pointwise)
 }
 
 # ----------------------------- Helpers -----------------------------
