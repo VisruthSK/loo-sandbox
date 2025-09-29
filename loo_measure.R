@@ -113,8 +113,24 @@ loo_pred_measure.matrix <- function(
   # TODO: fix this
 }
 
+# don't run
 .match_summary_function <- function(measure) {
   # TODO: write this
+  switch(
+    measure,
+    "elpd" = .elpd,
+    "logscore" = .logscore,
+    "mlpd" = .logscore,
+    "r2" = .r2,
+    "mae" = .simple_pointwise_summary,
+    "rmse" = .rmse,
+    "mse" = .simple_pointwise_summary,
+    "acc" = .simple_pointwise_summary,
+    "balanced_acc" = .simple_pointwise_summary,
+    "rps" = .simple_pointwise_summary,
+    "crps" = .simple_pointwise_summary,
+    "scrps" = .simple_pointwise_summary,
+  )
 }
 
 #' @param y A scalar, leave one out value
@@ -231,6 +247,10 @@ NULL
   )
 }
 
+# TODO:
+# add pointwise argument, take values from loo object
+# wrapper function shouldn't expose `pointwise`
+
 #' Classification accuracy
 #'
 #' @noRd
@@ -285,15 +305,25 @@ NULL
 
 # TODO: ylp is a matrix
 # TODO: Do pointwise and summary
+
+#' Pointwise log score
+#'
+#' @noRd
+#' @param ylp A vector of posterior draws of length S
+#' @inheritParams .metric_common_params
+.pointwise_elpd <- function(y, ylp, loo_weights) {
+  .loo_weighted_mean(ylp, loo_weights)
+}
+
 #' Log score
 #'
 #' @noRd
-#' @param ylp Numeric vector of pointwise LOO log predictive densities.
-.logscore <- function(y, ylp, weights) {
-  w <- if (is.null(weights)) 1 else weights
-  .elpd(y, ylp * w, NULL) |>
+#' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
+.logscore_summary <- function(y, ylp, loo_weights) {
+  w <- if (is.null(loo_weights)) 1 else loo_weights
+  .elpd_summary(y, ylp * w, NULL) |>
     (\(l) {
-      d <- if (is.null(weights)) length(y) else sum(weights)
+      d <- if (is.null(loo_weights)) length(y) else sum(loo_weights)
       modifyList(
         l,
         list(estimate = l$estimate / d, se = l$se / d)
@@ -304,13 +334,19 @@ NULL
 #' Expected log-predictive density
 #'
 #' @noRd
-#' @param ylp Numeric vector of pointwise LOO log predictive densities.
-.elpd <- function(y, ylp, weights) {
+#' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
+.elpd_summary <- function(y, ylp, loo_weights) {
   n <- length(y)
+  pointwise <- vapply(
+    seq_len(n),
+    function(i) .pointwise_elpd(y[i], ylp[, i], loo_weights),
+    numeric(1)
+  )
+
   list(
-    estimate = sum(ylp),
-    se = sqrt(n / (n - 1) * sum((ylp - .loo_weighted_mean(ylp, weights))^2)),
-    pointwise = ylp
+    estimate = sum(pointwise),
+    se = n^2 * .se_helper(pointwise, mean(pointwise), n),
+    pointwise = pointwise
   )
 }
 
@@ -452,4 +488,3 @@ NULL
     pointwise = pointwise
   )
 }
-
