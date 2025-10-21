@@ -349,7 +349,7 @@ NULL
 
   list(
     estimate = sum(pointwise),
-    # TODO: se formula wrong
+    # TODO: se formula wrong?
     se = n * .se_helper(pointwise, mean(pointwise), n),
     pointwise = pointwise
   )
