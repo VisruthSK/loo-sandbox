@@ -36,6 +36,8 @@ loo_pred_measure.matrix <- function(
     (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
       (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
   ) # TODO: flesh out checks
+
+  n <- length(y)
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
 
@@ -54,15 +56,16 @@ loo_pred_measure.matrix <- function(
         # ,"energy"
       )
   ) {
-    assert_matrix(ypred, ncols = length(y))
+    assert_matrix(ypred, ncols = n)
     args <- list(y, ypred)
   } else if (measure %in% c("elpd", "logscore")) {
-    assert_matrix(ylp, ncols = length(y))
+    assert_matrix(ylp, ncols = n)
     args <- list(y, ylp)
   }
 
-  # TODO: check if weights is correct length or null
-  assert_numeric(weights, len = length(y))
+  if (!is.null(weights)) {
+    assert_numeric(weights, len = n)
+  }
 
   do.call(pred_fun, append(args, weights))
 }
@@ -133,9 +136,11 @@ loo_pred_measure.matrix <- function(
   )
 }
 
+# TODO: check normalized  looweights somewhere
+
 #' @param y A scalar, leave one out value
 #' @param yhat A vector of posterior draws of length S
-#' @param loo_weights optional loo weights for calculation of metric. Set to NULL if unweighted
+#' @param loo_weights optional normalized loo weights for calculation of metric. Set to NULL if unweighted
 #'
 #' @keywords internal
 #' @name .metric_common_params
@@ -143,7 +148,7 @@ NULL
 
 #' @param y A vector of observed values
 #' @param yhat A matrix of posterior draws (S x n)
-#' @param loo_weights optional weights for calculation of metric. Set to NULL if unweighted
+#' @param loo_weights optional normalized weights for calculation of metric. Set to NULL if unweighted
 #'
 #' @keywords internal
 #' @name .summary_metric_common_params
@@ -172,7 +177,7 @@ NULL
 .mae_summary <- function(y, yhat, loo_weights) {
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .pointwise_absolute_error(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_absolute_error(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
   ))
 }
@@ -184,7 +189,7 @@ NULL
 .mse_summary <- function(y, yhat, loo_weights) {
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
   ))
 }
@@ -201,7 +206,7 @@ NULL
   n <- length(y)
   sq <- vapply(
     seq_len(n),
-    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
   )^2
   mean_mse <- mean(sq)
@@ -221,7 +226,7 @@ NULL
 
   mse_loo_pointwise <- vapply(
     seq_len(n),
-    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
   )
   mse_loo <- mean(mse_loo_pointwise)
@@ -247,7 +252,6 @@ NULL
   )
 }
 
-# TODO:
 # add pointwise argument, take values from loo object
 # wrapper function shouldn't expose `pointwise`
 
@@ -269,7 +273,7 @@ NULL
   assert_subset(yhat, choices = c(0, 1))
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .pointwise_accuracy(y[i], yhat[, i], loo_weights),
+    function(i) .pointwise_accuracy(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
   ))
 }
@@ -279,20 +283,20 @@ NULL
 #' @noRd
 #' @inheritParams .summary_metric_common_params
 .balanced_accuracy_summary <- function(y, yhat, loo_weights) {
+  # TODO: check again
   n <- length(y)
   cls_counts <- table(y)
 
   .simple_pointwise_summary(
     vapply(
       seq_len(n),
-      function(i) .pointwise_accuracy(y[i], yhat[, i], loo_weights),
+      function(i) .pointwise_accuracy(y[i], yhat[, i], loo_weights[, i]),
       numeric(1)
     ) *
       n /
       (length(cls_counts) * as.numeric(cls_counts[match(y, names(cls_counts))]))
   )
 }
-# TODO: check again
 
 # ----------------------------- Scores -------------------------------
 
@@ -303,30 +307,30 @@ NULL
 
 # TODO: .energy multivariate CRPS, add later
 
-# TODO: ylp is a matrix
-# TODO: Do pointwise and summary
-
 #' Pointwise log score
 #'
 #' @noRd
 #' @param ylp A vector of posterior draws of length S
+#' @param loo_weights a vector of looweights
 #' @inheritParams .metric_common_params
-.pointwise_elpd <- function(y, ylp, loo_weights) {
+.pointwise_elpd <- function(ylp, loo_weights) {
   .loo_weighted_mean(ylp, loo_weights)
 }
+
+# TODO: test if matched loo::elpd
 
 #' Log score
 #'
 #' @noRd
 #' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
-.logscore_summary <- function(y, ylp, loo_weights) {
-  w <- if (is.null(loo_weights)) 1 else loo_weights
-  .elpd_summary(y, ylp * w, NULL) |>
+#' @param loo_weights a matrix of looweights
+.logscore_summary <- function(ylp, loo_weights) {
+  .elpd_summary(ylp, loo_weights) |>
     (\(l) {
-      d <- if (is.null(loo_weights)) length(y) else sum(loo_weights)
+      n <- ncol(ylp)
       modifyList(
         l,
-        list(estimate = l$estimate / d, se = l$se / d)
+        list(estimate = l$estimate / n, se = l$se / n)
       )
     })()
 }
@@ -335,17 +339,18 @@ NULL
 #'
 #' @noRd
 #' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
-.elpd_summary <- function(y, ylp, loo_weights) {
-  n <- length(y)
+.elpd_summary <- function(ylp, loo_weights) {
+  n <- ncol(ylp)
   pointwise <- vapply(
     seq_len(n),
-    function(i) .pointwise_elpd(y[i], ylp[, i], loo_weights),
+    function(i) .pointwise_elpd(ylp[, i], loo_weights[, i]),
     numeric(1)
   )
 
   list(
     estimate = sum(pointwise),
-    se = n^2 * .se_helper(pointwise, mean(pointwise), n),
+    # TODO: se formula wrong
+    se = n * .se_helper(pointwise, mean(pointwise), n),
     pointwise = pointwise
   )
 }
@@ -454,8 +459,8 @@ NULL
 
   pointwise <- vapply(
     seq_len(n),
-    FUN = function(i) .rps(y[i], yhat[, i], loo_weights, scaled),
-    FUN.VALUE = numeric(1)
+    function(i) .rps(y[i], yhat[, i], loo_weights[, i], scaled),
+    numeric(1)
   )
 
   .simple_pointwise_summary(pointwise)

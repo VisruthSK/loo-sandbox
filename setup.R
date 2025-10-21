@@ -24,3 +24,6 @@ loo_compare(loo1, loo2)
 
 saveRDS(loo1, "loo1.RDS")
 saveRDS(loo2, "loo2.RDS")
+
+saveRDS(fit1, "fit1.RDS")
+saveRDS(fit2, "fit2.RDS")
