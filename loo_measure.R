@@ -186,33 +186,37 @@ NULL
 #'
 #' @noRd
 #' @inheritParams .summary_metric_common_params
-.mse_summary <- function(y, yhat, loo_weights) {
-  .simple_pointwise_summary(vapply(
+.mse_summary <- function(
+  y,
+  yhat,
+  loo_weights,
+  pointwise = vapply(
     seq_len(length(y)),
     function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
-  ))
+  )
+) {
+  .simple_pointwise_summary(pointwise)
 }
-
-# TODO: maybe memoize?
-# TODO: maybe this should be in a closure to share env with .rmse and .r2 so `.mse(y, yhat, weights)` is only calculated once on those?
-# do.call() and pass around env?
 
 #' Root mean squared error
 #'
 #' @noRd
 #' @inheritParams .summary_metric_common_params
-.rmse_summary <- function(y, yhat, loo_weights) {
-  n <- length(y)
-  sq <- vapply(
-    seq_len(n),
+.rmse_summary <- function(
+  y,
+  yhat,
+  loo_weights,
+  pointwise = vapply(
+    seq_len(length(y)),
     function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
-  )^2
+  )
+) {
   mean_mse <- mean(sq)
   list(
     estimate = sqrt(mean_mse),
-    se = sqrt(.se_helper(sq, mean_mse, n)^2 / mean_mse / 4), # Comes from the first order Taylor approx.
+    se = sqrt(.se_helper(sq, mean_mse, length(y))^2 / mean_mse / 4), # Comes from the first order Taylor approx.
     pointwise = sq
   )
 }
@@ -221,14 +225,19 @@ NULL
 #'
 #' @noRd
 #' @inheritParams .summary_metric_common_params
-.r2_summary <- function(y, yhat, loo_weights) {
-  n <- length(y)
-
-  mse_loo_pointwise <- vapply(
-    seq_len(n),
+.r2_summary <- function(
+  y,
+  yhat,
+  loo_weights,
+  pointwise = vapply(
+    seq_len(length(y)),
     function(i) .pointwise_squared_error(y[i], yhat[, i], loo_weights[, i]),
     numeric(1)
   )
+) {
+  n <- length(y)
+
+  mse_loo_pointwise <- pointwise
   mse_loo <- mean(mse_loo_pointwise)
   se_mse_loo <- .se_helper(mse_loo_pointwise, mse_loo, n)
 
@@ -300,7 +309,6 @@ NULL
 
 # ----------------------------- Scores -------------------------------
 
-# TODO: change measures to compute pointwise; summarize elsewhere
 # https://github.com/stan-dev/loo/blob/master/R/E_loo.R#L260
 # https://github.com/stan-dev/loo/blob/master/R/helpers.R#L36
 # https://github.com/stan-dev/loo/blob/master/R/loo.R#L427
@@ -311,19 +319,21 @@ NULL
 #'
 #' @noRd
 #' @param ylp A vector of posterior draws of length S
-#' @param loo_weights a vector of looweights
+#' @param loo_weights a vector of loo weights
 #' @inheritParams .metric_common_params
 .pointwise_elpd <- function(ylp, loo_weights) {
-  .loo_weighted_mean(ylp, loo_weights)
+  if (is.null(loo_weights)) {
+    matrixStats::logSumExp(ylp) - log(length(ylp))
+  } else {
+    matrixStats::logSumExp(ylp + log(loo_weights))
+  }
 }
-
-# TODO: test if matched loo::elpd
 
 #' Log score
 #'
 #' @noRd
 #' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
-#' @param loo_weights a matrix of looweights
+#' @param loo_weights a (S x n) matrix of loo weights
 .logscore_summary <- function(ylp, loo_weights) {
   .elpd_summary(ylp, loo_weights) |>
     (\(l) {
@@ -339,6 +349,7 @@ NULL
 #'
 #' @noRd
 #' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
+#' @param loo_weights a (S x n) matrix of loo weights
 .elpd_summary <- function(ylp, loo_weights) {
   n <- ncol(ylp)
   pointwise <- vapply(
@@ -349,7 +360,6 @@ NULL
 
   list(
     estimate = sum(pointwise),
-    # TODO: se formula wrong?
     se = n * .se_helper(pointwise, mean(pointwise), n),
     pointwise = pointwise
   )
@@ -477,8 +487,9 @@ NULL
 .loo_weighted_mean <- function(x, weights) {
   if (missing(weights) || is.null(weights)) {
     mean(x)
+  } else {
+    weighted.mean(x, weights)
   }
-  weighted.mean(x, weights)
 }
 
 .se_helper <- function(x, x_mean, n) {
