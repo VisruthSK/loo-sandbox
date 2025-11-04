@@ -1,12 +1,6 @@
 library(checkmate)
 
-# TODO: write documentation
-loo_pred_measure <- function(y, ...) {
-  UseMethod("loo_pred_measure")
-}
-
-# TODO: how does dispatch work if we can have ypred or ylp or mupred?
-loo_pred_measure.matrix <- function(
+loo_pred_measure <- function(
   y = NULL,
   ypred = NULL,
   mupred = NULL,
@@ -51,34 +45,48 @@ loo_pred_measure.matrix <- function(
         "rmse",
         "r2",
         "acc",
-        "balanced_acc",
-        "rps",
-        "crps",
-        "scrps"
-        # ,"energy"
+        "balanced_acc"
       )
   ) {
-    assert_matrix(ypred, ncols = n, nrows = S)
-    args <- list(y = y, yhat = ypred)
-  } else if (measure %in% c("elpd", "logscore")) {
-    assert_matrix(ylp, ncols = n, nrows = S)
-    args <- list(yhat = ylp)
+    # TODO: check warning msgs
+    assert_matrix(mupred, nrows = S, ncols = n)
+    args <- list(y, mupred)
+  } else if (
+    measure %in%
+      c(
+        "rps",
+        "crps",
+        # "energy",
+        "scrps"
+      )
+  ) {
+    assert_matrix(ypred, nrows = S, ncols = n)
+    args <- list(y, ypred)
+  } else if (
+    measure %in%
+      c(
+        "elpd",
+        "logscore"
+      )
+  ) {
+    assert_matrix(ylp, nrows = S, ncols = n)
+    args <- list(ylp)
   }
 
+  # normalize given weights or provide equal weights if not given
   if (!is.null(log_weights)) {
-    assert_matrix(log_weights, ncols = n, nrows = S)
-    tol <- sqrt(.Machine$double.eps)
-    assert_numeric(
+    assert_matrix(log_weights, nrows = S, ncols = n)
+    log_weights <- sweep(
+      log_weights,
+      2,
       matrixStats::colLogSumExps(log_weights),
-      # bounds aren't too tight but still practically 0
-      lower = -tol,
-      upper = tol,
-      any.missing = FALSE,
-      len = n
+      FUN = "-"
     )
+  } else {
+    log_weights <- matrix(-log(S), nrow = S, ncol = n)
   }
 
-  do.call(pred_fun, append(args, list(log_weights = log_weights)))
+  do.call(pred_fun, append(args, list(log_weights)))
 }
 
 # ----------------------------- Measures -----------------------------
@@ -103,7 +111,8 @@ loo_pred_measure.matrix <- function(
     "balanced_acc" = .balanced_accuracy_summary,
     "rps" = .rps_summary,
     "crps" = .rps_summary,
-    "scrps" = .srps_summary
+    "srps" = .scrps_summary, # TODO: is this needed
+    "scrps" = .scrps_summary
     # , "energy" = .energy
   )
 }
@@ -126,50 +135,56 @@ loo_pred_measure.matrix <- function(
   )
 }
 
-#' @param y A scalar, leave one out value
-#' @param yhat A vector of posterior draws (S)
-#' @param log_weights optional, normalized vector of loo weights (S) on the log scale for calculation of metric. Set to NULL if unweighted.
-#'
-#' @keywords internal
-#' @name .pointwise_metric_common_params
-NULL
-
-#' @param y A vector of observed values
-#' @param yhat A matrix of posterior draws (S x n)
-#' @param log_weights optional, normalized matrix of loo weights (S x n) on the log scale for calculation of metric. Set to NULL if unweighted.
-#'
-#' @keywords internal
-#' @name .summary_metric_common_params
-NULL
-
-#' Pointwise absolute error
+#' @param y scalar, leave one out value
+#' @param ypred vector (S) of posterior predictive draws
+#' @param ylp vector (S) of pointwise LOO log predictive densities
+#' @param mupred vector (S) of point predictions
+#' @param log_weights vector of loo weights (S) on the log scale for calculation of measure
 #'
 #' @noRd
-#' @inheritParams .pointwise_metric_common_params
-.pointwise_absolute_error <- function(y, yhat, log_weights) {
-  abs(y - .loo_weighted_mean(yhat, log_weights))
+#' @keywords internal
+#' @name .pointwise_measure_params
+NULL
+
+#' @param y vector of observed values
+#' @param ypred matrix of posterior draws (S x n) of posterior predictive draws
+#' @param ylp matrix of posterior draws (S x n) of pointwise LOO log predictive densities
+#' @param mupred matrix of posterior draws (S x n) of point predictions
+#' @param log_weights matrix of loo weights (S x n) on the log scale for calculation of measure
+#'
+#' @noRd
+#' @keywords internal
+#' @name .summary_measure_params
+NULL
+
+# ----------------------------- Metrics -----------------------------
+
+# TODO: internal functions can assume weights always not null
+#' Pointwise absolute error
+#'
+#' @inheritParams .pointwise_measure_params
+.pointwise_absolute_error <- function(y, mupred, log_weights) {
+  abs(y - .loo_weighted_mean(mupred, log_weights))
 }
 
 #' Pointwise squared error
 #'
-#' @noRd
-#' @inheritParams .pointwise_metric_common_params
-.pointwise_squared_error <- function(y, yhat, log_weights) {
-  (y - .loo_weighted_mean(yhat, log_weights))^2
+#' @inheritParams .pointwise_measure_params
+.pointwise_squared_error <- function(y, mupred, log_weights) {
+  (y - .loo_weighted_mean(mupred, log_weights))^2
 }
 
 #' Mean absolute error
 #'
-#' @noRd
-#' @inheritParams .summary_metric_common_params
-.mae_summary <- function(y, yhat, log_weights) {
+#' @inheritParams .summary_measure_params
+.mae_summary <- function(y, mupred, log_weights) {
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
     function(i) {
       .pointwise_absolute_error(
         y[i],
-        yhat[, i],
-        if (!is.null(log_weights)) log_weights[, i]
+        mupred[, i],
+        log_weights[, i]
       )
     },
     numeric(1)
@@ -178,19 +193,18 @@ NULL
 
 #' Mean squared error
 #'
-#' @noRd
-#' @inheritParams .summary_metric_common_params
+#' @inheritParams .summary_measure_params
 .mse_summary <- function(
   y,
-  yhat,
+  mupred,
   log_weights,
   pointwise = vapply(
     seq_len(length(y)),
     function(i) {
       .pointwise_squared_error(
         y[i],
-        yhat[, i],
-        if (!is.null(log_weights)) log_weights[, i]
+        mupred[, i],
+        log_weights[, i]
       )
     },
     numeric(1)
@@ -202,18 +216,18 @@ NULL
 #' Root mean squared error
 #'
 #' @noRd
-#' @inheritParams .summary_metric_common_params
+#' @inheritParams .summary_measure_params
 .rmse_summary <- function(
   y,
-  yhat,
+  mupred,
   log_weights,
   pointwise = vapply(
     seq_len(length(y)),
     function(i) {
       .pointwise_squared_error(
         y[i],
-        yhat[, i],
-        if (!is.null(log_weights)) log_weights[, i]
+        mupred[, i],
+        log_weights[, i]
       )
     },
     numeric(1)
@@ -229,19 +243,18 @@ NULL
 
 #' R^2
 #'
-#' @noRd
-#' @inheritParams .summary_metric_common_params
+#' @inheritParams .summary_measure_params
 .r2_summary <- function(
   y,
-  yhat,
+  mupred,
   log_weights,
   pointwise = vapply(
     seq_len(length(y)),
     function(i) {
       .pointwise_squared_error(
         y[i],
-        yhat[, i],
-        if (!is.null(log_weights)) log_weights[, i]
+        mupred[, i],
+        log_weights[, i]
       )
     },
     numeric(1)
@@ -278,27 +291,25 @@ NULL
 
 #' Classification accuracy
 #'
-#' @noRd
-#' @inheritParams .pointwise_metric_common_params
-.pointwise_accuracy <- function(y, yhat, log_weights) {
-  .loo_weighted_mean(yhat == y, log_weights)
+#' @inheritParams .pointwise_measure_params
+.pointwise_accuracy <- function(y, mupred, log_weights) {
+  .loo_weighted_mean(mupred == y, log_weights)
 }
 
 #' Classification accuracy
 #'
-#' Assuming values in `yhat` only take on 0 or 1
+#' Assuming values in `mupred` only take on 0 or 1
 #'
-#' @noRd
-#' @inheritParams .summary_metric_common_params
-.accuracy_summary <- function(y, yhat, log_weights) {
-  assert_subset(yhat, choices = c(0, 1))
+#' @inheritParams .summary_measure_params
+.accuracy_summary <- function(y, mupred, log_weights) {
+  assert_subset(mupred, choices = c(0, 1))
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
     function(i) {
       .pointwise_accuracy(
         y[i],
-        yhat[, i],
-        if (!is.null(log_weights)) log_weights[, i]
+        mupred[, i],
+        log_weights[, i]
       )
     },
     numeric(1)
@@ -307,9 +318,8 @@ NULL
 
 #' Balanced classification accuracy
 #'
-#' @noRd
-#' @inheritParams .summary_metric_common_params
-.balanced_accuracy_summary <- function(y, yhat, log_weights) {
+#' @inheritParams .summary_measure_params
+.balanced_accuracy_summary <- function(y, mupred, log_weights) {
   # TODO: check again
   n <- length(y)
   cls_counts <- table(y)
@@ -320,8 +330,8 @@ NULL
       function(i) {
         .pointwise_accuracy(
           y[i],
-          yhat[, i],
-          if (!is.null(log_weights)) log_weights[, i]
+          mupred[, i],
+          log_weights[, i]
         )
       },
       numeric(1)
@@ -341,9 +351,7 @@ NULL
 
 #' Pointwise log score
 #'
-#' @noRd
-#' @param ylp A vector of posterior draws of length S
-#' @inheritParams .pointwise_metric_common_params
+#' @inheritParams .pointwise_measure_params
 .pointwise_elpd <- function(ylp, log_weights) {
   if (is.null(log_weights)) {
     matrixStats::logSumExp(ylp) - log(length(ylp))
@@ -354,9 +362,7 @@ NULL
 
 #' Log score
 #'
-#' @noRd
-#' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
-#' @inheritParams .summary_metric_common_params
+#' @inheritParams .summary_measure_params
 .logscore_summary <- function(ylp, log_weights) {
   .elpd_summary(ylp, log_weights) |>
     (\(l) {
@@ -370,15 +376,13 @@ NULL
 
 #' Expected log-predictive density
 #'
-#' @noRd
-#' @param ylp A matrix of posterior draws (S x n) of pointwise LOO log predictive densities.
-#' @inheritParams .summary_metric_common_params
+#' @inheritParams .summary_measure_params
 .elpd_summary <- function(ylp, log_weights) {
   n <- ncol(ylp)
   pointwise <- vapply(
     seq_len(n),
     function(i) {
-      .pointwise_elpd(ylp[, i], if (!is.null(log_weights)) log_weights[, i])
+      .pointwise_elpd(ylp[, i], log_weights[, i])
     },
     numeric(1)
   )
@@ -391,16 +395,15 @@ NULL
 
 #' CRPS
 #'
-#' @noRd
-#' @inheritParams .pointwise_metric_common_params
-.rps <- function(y, yhat, log_weights, scaled) {
+#' @inheritParams .pointwise_measure_params
+.rps <- function(y, ypred, log_weights, scaled) {
   if (is.null(log_weights)) {
-    EXy <- mean(abs(y - yhat))
+    EXy <- mean(abs(y - ypred))
     y <- sort(y)
     n <- length(y)
     EXX <- -2 * mean(y - 2 * y * (0:(n - 1)) / (n - 1))
   } else {
-    EXy <- sum(log_weights * abs(y - yhat))
+    EXy <- sum(log_weights * abs(y - ypred))
     ord <- order(y)
     y <- y[ord]
     log_weights <- log_weights[ord]
@@ -421,11 +424,11 @@ NULL
 
 #' (Continuous) Ranked Probability Score
 #'
-#' Given draws x from the predictive distribution and the observations y,
+#' Given draws ypred from the predictive distribution and the observations y,
 #' computes
-#'   - rank probability score (Epstein, 1969) for discrete x and y and
+#'   - rank probability score (Epstein, 1969) for discrete ypred and y and
 #'     continuous rank probability score (Matheson and Winkler, 1976;
-#'     Gneiting & Raftery, 2007) for continuous x and y, using the
+#'     Gneiting & Raftery, 2007) for continuous ypred and y, using the
 #'     probability weighted moment form (Taillardat et al., 2016;
 #'     Zamo & Naveau, 2017)
 #'   - scaled versions of these, if `scaled=TRUE` (Bolin & Wallin, 2023).
@@ -484,18 +487,21 @@ NULL
 #'   to Ensemble Weather Forecasts. \emph{Mathematical Geosciences},
 #'   50, 209–234.
 #' }
-#' @noRd
-#' @param y A vector of observed values
-#' @param ypred Predictive draws matrix
-#' @param log_weights Optional nonnegative log_weights for draws
+#'
 #' @param scaled logical. If true, computes SRPS/SCRPS
-.rps_summary <- function(y, yhat, log_weights, scaled = FALSE) {
+#' @inheritParams .summary_measure_params
+.rps_summary <- function(y, ypred, log_weights, scaled = FALSE) {
   n <- length(y)
 
   pointwise <- vapply(
     seq_len(n),
     function(i) {
-      .rps(y[i], yhat[, i], if (!is.null(log_weights)) log_weights[, i], scaled)
+      .rps(
+        y[i],
+        ypred[, i],
+        log_weights[, i],
+        scaled
+      )
     },
     numeric(1)
   )
@@ -503,12 +509,13 @@ NULL
   .simple_pointwise_summary(pointwise)
 }
 
-.srps_summary <- function(y, yhat, log_weights) {
-  .rps_summary(y, yhat, log_weights, scaled = TRUE)
+.scrps_summary <- function(y, ypred, log_weights) {
+  .rps_summary(y, ypred, log_weights, scaled = TRUE)
 }
 
 # ----------------------------- Helpers -----------------------------
 
+# TODO: weights always provided
 #' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
 #'
 #' @noRd
