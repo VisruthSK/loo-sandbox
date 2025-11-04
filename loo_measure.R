@@ -1,17 +1,18 @@
 library(checkmate)
 
 # TODO: write documentation
-loo_pred_measure <- function(x, ...) {
+loo_pred_measure <- function(y, ...) {
   UseMethod("loo_pred_measure")
 }
 
+# TODO: how does dispatch work if we can have ypred or ylp or mupred?
 loo_pred_measure.matrix <- function(
   y = NULL,
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
   loo = NULL,
-  weights = NULL,
+  log_weights = NULL,
   measure = c(
     "logscore",
     "elpd",
@@ -30,14 +31,15 @@ loo_pred_measure.matrix <- function(
   psis_object = NULL,
   save_psis = FALSE
 ) {
-  stopifnot(
-    is.numeric(y),
-    # TODO: check that for scores there are y and ypred and for metrics there are y and mupred
-    (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
-      (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
-  ) # TODO: flesh out checks
+  # stopifnot(
+  #   is.numeric(y),
+  #   # TODO: check that for scores there are y and ypred and for metrics there are y and mupred
+  #   (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
+  #     (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
+  # ) # TODO: flesh out checks
 
   n <- length(y)
+  S <- if (!is.null(ypred)) nrow(ypred) else nrow(ylp)
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
 
@@ -56,18 +58,27 @@ loo_pred_measure.matrix <- function(
         # ,"energy"
       )
   ) {
-    assert_matrix(ypred, ncols = n)
-    args <- list(y, ypred)
+    assert_matrix(ypred, ncols = n, nrows = S)
+    args <- list(y = y, yhat = ypred)
   } else if (measure %in% c("elpd", "logscore")) {
-    assert_matrix(ylp, ncols = n)
-    args <- list(y, ylp)
+    assert_matrix(ylp, ncols = n, nrows = S)
+    args <- list(yhat = ylp)
   }
 
-  if (!is.null(weights)) {
-    assert_numeric(weights, len = n)
+  if (!is.null(log_weights)) {
+    assert_matrix(log_weights, ncols = n, nrows = S)
+    tol <- sqrt(.Machine$double.eps)
+    assert_numeric(
+      matrixStats::colLogSumExps(log_weights),
+      # bounds aren't too tight but still practically 0
+      lower = -tol,
+      upper = tol,
+      any.missing = FALSE,
+      len = n
+    )
   }
 
-  do.call(pred_fun, append(args, weights))
+  do.call(pred_fun, append(args, list(log_weights = log_weights)))
 }
 
 # ----------------------------- Measures -----------------------------
@@ -81,18 +92,18 @@ loo_pred_measure.matrix <- function(
 .loo_predictive_measure_fun <- function(measure) {
   switch(
     measure,
-    "elpd" = .elpd,
-    "logscore" = .logscore,
-    "mlpd" = .logscore,
-    "r2" = .r2,
-    "mae" = .pointwise_absolute_error,
-    "rmse" = .rmse,
-    "mse" = .mse,
-    "acc" = .accuracy,
-    "balanced_acc" = .balanced_accuracy,
-    "rps" = .rps,
-    "crps" = .rps,
-    "scrps" = function(y, yhat) .rps(y, yhat, scaled = TRUE)
+    "elpd" = .elpd_summary,
+    "logscore" = .logscore_summary,
+    "mlpd" = .logscore_summary,
+    "r2" = .r2_summary,
+    "mae" = .mae_summary,
+    "rmse" = .rmse_summary,
+    "mse" = .mse_summary,
+    "acc" = .accuracy_summary,
+    "balanced_acc" = .balanced_accuracy_summary,
+    "rps" = .rps_summary,
+    "crps" = .rps_summary,
+    "scrps" = .srps_summary
     # , "energy" = .energy
   )
 }
@@ -100,9 +111,9 @@ loo_pred_measure.matrix <- function(
 .match_pointwise_function <- function(measure) {
   switch(
     measure,
-    "elpd" = .elpd,
-    "logscore" = .logscore,
-    "mlpd" = .logscore,
+    "elpd" = .pointwise_elpd,
+    "logscore" = .pointwise_elpd,
+    "mlpd" = .pointwise_elpd,
     "r2" = .pointwise_squared_error,
     "mae" = .pointwise_absolute_error,
     "rmse" = .pointwise_squared_error,
@@ -111,36 +122,13 @@ loo_pred_measure.matrix <- function(
     "balanced_acc" = .pointwise_accuracy,
     "rps" = .rps,
     "crps" = .rps,
-    "scrps" = .rps,
-  )
-  # TODO: fix this
-}
-
-# don't run
-.match_summary_function <- function(measure) {
-  # TODO: write this
-  switch(
-    measure,
-    "elpd" = .elpd,
-    "logscore" = .logscore,
-    "mlpd" = .logscore,
-    "r2" = .r2,
-    "mae" = .simple_pointwise_summary,
-    "rmse" = .rmse,
-    "mse" = .simple_pointwise_summary,
-    "acc" = .simple_pointwise_summary,
-    "balanced_acc" = .simple_pointwise_summary,
-    "rps" = .simple_pointwise_summary,
-    "crps" = .simple_pointwise_summary,
-    "scrps" = .simple_pointwise_summary,
+    "scrps" = .rps
   )
 }
-
-# TODO: check normalized  looweights somewhere
 
 #' @param y A scalar, leave one out value
 #' @param yhat A vector of posterior draws (S)
-#' @param log_weights optional normalized vector of loo weights (S) on the log scale for calculation of metric. Set to NULL if unweighted.
+#' @param log_weights optional, normalized vector of loo weights (S) on the log scale for calculation of metric. Set to NULL if unweighted.
 #'
 #' @keywords internal
 #' @name .pointwise_metric_common_params
@@ -148,7 +136,7 @@ NULL
 
 #' @param y A vector of observed values
 #' @param yhat A matrix of posterior draws (S x n)
-#' @param log_weights optional normalized matrix of loo weights (S x n) on the log scale for calculation of metric. Set to NULL if unweighted.
+#' @param log_weights optional, normalized matrix of loo weights (S x n) on the log scale for calculation of metric. Set to NULL if unweighted.
 #'
 #' @keywords internal
 #' @name .summary_metric_common_params
@@ -177,7 +165,13 @@ NULL
 .mae_summary <- function(y, yhat, log_weights) {
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .pointwise_absolute_error(y[i], yhat[, i], log_weights[, i]),
+    function(i) {
+      .pointwise_absolute_error(
+        y[i],
+        yhat[, i],
+        if (!is.null(log_weights)) log_weights[, i]
+      )
+    },
     numeric(1)
   ))
 }
@@ -192,7 +186,13 @@ NULL
   log_weights,
   pointwise = vapply(
     seq_len(length(y)),
-    function(i) .pointwise_squared_error(y[i], yhat[, i], log_weights[, i]),
+    function(i) {
+      .pointwise_squared_error(
+        y[i],
+        yhat[, i],
+        if (!is.null(log_weights)) log_weights[, i]
+      )
+    },
     numeric(1)
   )
 ) {
@@ -209,15 +209,21 @@ NULL
   log_weights,
   pointwise = vapply(
     seq_len(length(y)),
-    function(i) .pointwise_squared_error(y[i], yhat[, i], log_weights[, i]),
+    function(i) {
+      .pointwise_squared_error(
+        y[i],
+        yhat[, i],
+        if (!is.null(log_weights)) log_weights[, i]
+      )
+    },
     numeric(1)
   )
 ) {
-  mean_mse <- mean(sq)
+  mean_mse <- mean(pointwise)
   list(
     estimate = sqrt(mean_mse),
-    se = sqrt(.se_helper(sq, mean_mse, length(y))^2 / mean_mse / 4), # Comes from the first order Taylor approx.
-    pointwise = sq
+    se = .se_helper(pointwise, mean_mse, length(y)) / sqrt(mean_mse) / 2, # Comes from the first order Taylor approx.
+    pointwise = pointwise
   )
 }
 
@@ -231,7 +237,13 @@ NULL
   log_weights,
   pointwise = vapply(
     seq_len(length(y)),
-    function(i) .pointwise_squared_error(y[i], yhat[, i], log_weights[, i]),
+    function(i) {
+      .pointwise_squared_error(
+        y[i],
+        yhat[, i],
+        if (!is.null(log_weights)) log_weights[, i]
+      )
+    },
     numeric(1)
   )
 ) {
@@ -282,7 +294,13 @@ NULL
   assert_subset(yhat, choices = c(0, 1))
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
-    function(i) .pointwise_accuracy(y[i], yhat[, i], log_weights[, i]),
+    function(i) {
+      .pointwise_accuracy(
+        y[i],
+        yhat[, i],
+        if (!is.null(log_weights)) log_weights[, i]
+      )
+    },
     numeric(1)
   ))
 }
@@ -299,7 +317,13 @@ NULL
   .simple_pointwise_summary(
     vapply(
       seq_len(n),
-      function(i) .pointwise_accuracy(y[i], yhat[, i], log_weights[, i]),
+      function(i) {
+        .pointwise_accuracy(
+          y[i],
+          yhat[, i],
+          if (!is.null(log_weights)) log_weights[, i]
+        )
+      },
       numeric(1)
     ) *
       n /
@@ -353,7 +377,9 @@ NULL
   n <- ncol(ylp)
   pointwise <- vapply(
     seq_len(n),
-    function(i) .pointwise_elpd(ylp[, i], log_weights[, i]),
+    function(i) {
+      .pointwise_elpd(ylp[, i], if (!is.null(log_weights)) log_weights[, i])
+    },
     numeric(1)
   )
   list(
@@ -365,6 +391,7 @@ NULL
 
 #' CRPS
 #'
+#' @noRd
 #' @inheritParams .pointwise_metric_common_params
 .rps <- function(y, yhat, log_weights, scaled) {
   if (is.null(log_weights)) {
@@ -460,18 +487,24 @@ NULL
 #' @noRd
 #' @param y A vector of observed values
 #' @param ypred Predictive draws matrix
-#' @param log_weights Optional nonnegative log_weightss for draws
+#' @param log_weights Optional nonnegative log_weights for draws
 #' @param scaled logical. If true, computes SRPS/SCRPS
-.rps_summary <- function(y, yhat, log_weights, scaled) {
+.rps_summary <- function(y, yhat, log_weights, scaled = FALSE) {
   n <- length(y)
 
   pointwise <- vapply(
     seq_len(n),
-    function(i) .rps(y[i], yhat[, i], log_weights[, i], scaled),
+    function(i) {
+      .rps(y[i], yhat[, i], if (!is.null(log_weights)) log_weights[, i], scaled)
+    },
     numeric(1)
   )
 
   .simple_pointwise_summary(pointwise)
+}
+
+.srps_summary <- function(y, yhat, log_weights) {
+  .rps_summary(y, yhat, log_weights, scaled = TRUE)
 }
 
 # ----------------------------- Helpers -----------------------------
@@ -479,14 +512,14 @@ NULL
 #' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
 #'
 #' @noRd
-#' @param x vector to take mean of
-#' @param weights optional weights. Set to `NULL` if unweighted mean is desired.
-#' @return The mean of `x`, optionally weighted by `weights` if specified.
-.loo_weighted_mean <- function(x, weights) {
-  if (missing(weights) || is.null(weights)) {
+#' @param x vector to take mean of.
+#' @param log_weights optional log weights. Set to `NULL` if unweighted mean is desired.
+#' @return The (un)weighted mean of `x`.
+.loo_weighted_mean <- function(x, log_weights) {
+  if (is.null(log_weights) || missing(log_weights)) {
     mean(x)
   } else {
-    weighted.mean(x, weights)
+    sum(x * exp(log_weights - matrixStats::logSumExp(log_weights)))
   }
 }
 
