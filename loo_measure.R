@@ -13,6 +13,7 @@ loo_pred_measure <- function(
     "r2",
     "rps",
     "crps",
+    "srps", # TODO: is this needed
     "scrps",
     "mae",
     "rmse",
@@ -25,18 +26,19 @@ loo_pred_measure <- function(
   psis_object = NULL,
   save_psis = FALSE
 ) {
-  # stopifnot(
-  #   is.numeric(y),
-  #   # TODO: check that for scores there are y and ypred and for metrics there are y and mupred
-  #   (is.numeric(y) || is.function(ypred) && is.null(mupred)) ||
-  #     (is.numeric(mupred) || is.function(mupred) && is.null(ypred))
-  # ) # TODO: flesh out checks
-
   n <- length(y)
-  S <- if (!is.null(ypred)) nrow(ypred) else nrow(ylp)
+  # TODO: refactor this--ypred etc could be functions
+  S <- if (!is.null(ypred)) {
+    nrow(ypred)
+  } else if (!is.null(ylp)) {
+    nrow(ylp)
+  } else if (!is.null(mupred)) {
+    nrow(mupred)
+  }
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
 
+  # TODO: check warning msgs
   if (
     measure %in%
       c(
@@ -48,7 +50,6 @@ loo_pred_measure <- function(
         "balanced_acc"
       )
   ) {
-    # TODO: check warning msgs
     assert_matrix(mupred, nrows = S, ncols = n)
     args <- list(y, mupred)
   } else if (
@@ -73,17 +74,16 @@ loo_pred_measure <- function(
     args <- list(ylp)
   }
 
-  # normalize given weights or provide equal weights if not given
-  if (!is.null(log_weights)) {
+  # provide equal weights or normalize given weights
+  if (is.null(log_weights) || missing(log_weights)) {
+    log_weights <- matrix(-log(S), nrow = S, ncol = n)
+  } else {
     assert_matrix(log_weights, nrows = S, ncols = n)
     log_weights <- sweep(
       log_weights,
       2,
-      matrixStats::colLogSumExps(log_weights),
-      FUN = "-"
+      matrixStats::colLogSumExps(log_weights)
     )
-  } else {
-    log_weights <- matrix(-log(S), nrow = S, ncol = n)
   }
 
   do.call(pred_fun, append(args, list(log_weights)))
@@ -139,7 +139,7 @@ loo_pred_measure <- function(
 #' @param ypred vector (S) of posterior predictive draws
 #' @param ylp vector (S) of pointwise LOO log predictive densities
 #' @param mupred vector (S) of point predictions
-#' @param log_weights vector of loo weights (S) on the log scale for calculation of measure
+#' @param log_weights vector of loo weights (S) on the log scale
 #'
 #' @noRd
 #' @keywords internal
@@ -150,7 +150,7 @@ NULL
 #' @param ypred matrix of posterior draws (S x n) of posterior predictive draws
 #' @param ylp matrix of posterior draws (S x n) of pointwise LOO log predictive densities
 #' @param mupred matrix of posterior draws (S x n) of point predictions
-#' @param log_weights matrix of loo weights (S x n) on the log scale for calculation of measure
+#' @param log_weights matrix of loo weights (S x n) on the log scale
 #'
 #' @noRd
 #' @keywords internal
@@ -159,7 +159,6 @@ NULL
 
 # ----------------------------- Metrics -----------------------------
 
-# TODO: internal functions can assume weights always not null
 #' Pointwise absolute error
 #'
 #' @inheritParams .pointwise_measure_params
@@ -190,6 +189,8 @@ NULL
     numeric(1)
   ))
 }
+
+# TODO: take pointwise values from loo object--wrapper function shouldn't expose `pointwise`
 
 #' Mean squared error
 #'
@@ -285,9 +286,6 @@ NULL
     pointwise = mse_loo_pointwise
   )
 }
-
-# add pointwise argument, take values from loo object
-# wrapper function shouldn't expose `pointwise`
 
 #' Classification accuracy
 #'
@@ -519,15 +517,11 @@ NULL
 #' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
 #'
 #' @noRd
-#' @param x vector to take mean of.
-#' @param log_weights optional log weights. Set to `NULL` if unweighted mean is desired.
-#' @return The (un)weighted mean of `x`.
+#' @param x vector to take mean of
+#' @param log_weights log weights
+#' @return weighted mean of `x`
 .loo_weighted_mean <- function(x, log_weights) {
-  if (is.null(log_weights) || missing(log_weights)) {
-    mean(x)
-  } else {
-    sum(x * exp(log_weights - matrixStats::logSumExp(log_weights)))
-  }
+  sum(x * exp(log_weights - matrixStats::logSumExp(log_weights)))
 }
 
 .se_helper <- function(x, x_mean, n) {
