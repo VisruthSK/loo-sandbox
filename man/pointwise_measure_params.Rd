@@ -2,7 +2,7 @@
 % Please edit documentation in R/loo_measure.R
 \name{pointwise_measure_params}
 \alias{pointwise_measure_params}
-\title{Shared parameters for pointwise}
+\title{Shared parameters for pointwise functions}
 \arguments{
 \item{y}{scalar, leave one out value}
 
@@ -15,6 +15,6 @@
 \item{log_weights}{vector of loo weights (S) on the log scale}
 }
 \description{
-Shared parameters for pointwise
+Shared parameters for pointwise functions
 }
 \keyword{internal}

@@ -2,9 +2,9 @@
 % Please edit documentation in R/loo_measure.R
 \name{summary_measure_params}
 \alias{summary_measure_params}
-\title{Shared parameters for summary}
+\title{Shared parameters for summary functions}
 \arguments{
-\item{y}{vector of observed values}
+\item{y}{vector of observed values (n)}
 
 \item{ypred}{matrix of posterior draws (S x n) of posterior predictive draws}
 
@@ -13,8 +13,10 @@
 \item{mupred}{matrix of posterior draws (S x n) of point predictions}
 
 \item{log_weights}{matrix of loo weights (S x n) on the log scale}
+
+\item{pointwise}{optional precomputed pointwise squared errors (n)}
 }
 \description{
-Shared parameters for summary
+Shared parameters for summary functions
 }
 \keyword{internal}

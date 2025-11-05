@@ -12,7 +12,8 @@ loo_pred_measure <- function(
     "r2",
     "rps",
     "crps",
-    "srps", # TODO: is this needed
+    # TODO: is srps option needed
+    "srps",
     "scrps",
     "mae",
     "rmse",
@@ -25,6 +26,8 @@ loo_pred_measure <- function(
   psis_object = NULL,
   save_psis = FALSE
 ) {
+  # TODO: document function
+
   n <- length(y)
   # TODO: refactor this--ypred etc could be functions
   S <- if (!is.null(ypred)) {
@@ -38,6 +41,7 @@ loo_pred_measure <- function(
   pred_fun <- .loo_predictive_measure_fun(measure)
 
   # TODO: check warning msgs
+  # check appropriate arguments for measure
   if (
     measure %in%
       c(
@@ -110,11 +114,17 @@ loo_pred_measure <- function(
     "balanced_acc" = .balanced_accuracy_summary,
     "rps" = .rps_summary,
     "crps" = .rps_summary,
-    "srps" = .scrps_summary, # TODO: is this needed
-    "scrps" = .scrps_summary
+    # TODO: is srps option needed
+    "srps" = function(y, ypred, log_weights) {
+      .rps_summary(y, ypred, log_weights, scaled = TRUE)
+    },
+    "scrps" = function(y, ypred, log_weights) {
+      .rps_summary(y, ypred, log_weights, scaled = TRUE)
+    }
     # , "energy" = .energy
   )
 }
+
 
 #' Identify pointwise function by `measure`
 #'
@@ -139,7 +149,7 @@ loo_pred_measure <- function(
   )
 }
 
-#' Shared parameters for pointwise
+#' Shared parameters for pointwise functions
 #'
 #' @param y scalar, leave one out value
 #' @param ypred vector (S) of posterior predictive draws
@@ -151,13 +161,17 @@ loo_pred_measure <- function(
 #' @name pointwise_measure_params
 NULL
 
-#' Shared parameters for summary
+# Note that `pointwise` below is only for mse, rmse, and r2
+
+#' Shared parameters for summary functions
 #'
-#' @param y vector of observed values
+#' @param y vector of observed values (n)
 #' @param ypred matrix of posterior draws (S x n) of posterior predictive draws
 #' @param ylp matrix of posterior draws (S x n) of pointwise LOO log predictive densities
 #' @param mupred matrix of posterior draws (S x n) of point predictions
 #' @param log_weights matrix of loo weights (S x n) on the log scale
+#'
+#' @param pointwise optional precomputed pointwise squared errors (n)
 #'
 #' @keywords internal
 #' @name summary_measure_params
@@ -204,7 +218,6 @@ NULL
 #' Mean squared error
 #'
 #' @noRd
-#' @param pointwise optionally pass precomputed `pointwise` squared errors--else, automatically calculated
 #' @inheritParams summary_measure_params
 .mse_summary <- function(
   y,
@@ -228,7 +241,6 @@ NULL
 #' Root mean squared error
 #'
 #' @noRd
-#' @param pointwise optionally pass precomputed `pointwise` squared errors--else, automatically calculated
 #' @inheritParams summary_measure_params
 .rmse_summary <- function(
   y,
@@ -257,7 +269,6 @@ NULL
 #' R^2
 #'
 #' @noRd
-#' @param pointwise optionally pass precomputed `pointwise` squared errors--else, automatically calculated
 #' @inheritParams summary_measure_params
 .r2_summary <- function(
   y,
@@ -531,10 +542,6 @@ NULL
   )
 
   .simple_pointwise_summary(pointwise)
-}
-
-.scrps_summary <- function(y, ypred, log_weights) {
-  .rps_summary(y, ypred, log_weights, scaled = TRUE)
 }
 
 # ----------------------------- Helpers -----------------------------
