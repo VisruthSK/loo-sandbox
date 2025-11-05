@@ -61,6 +61,7 @@ loo_pred_measure <- function(
         "rps",
         "crps",
         # "energy",
+        "srps",
         "scrps"
       )
   ) {
@@ -115,12 +116,8 @@ loo_pred_measure <- function(
     "rps" = .rps_summary,
     "crps" = .rps_summary,
     # TODO: is srps option needed
-    "srps" = function(y, ypred, log_weights) {
-      .rps_summary(y, ypred, log_weights, scaled = TRUE)
-    },
-    "scrps" = function(y, ypred, log_weights) {
-      .rps_summary(y, ypred, log_weights, scaled = TRUE)
-    }
+    "srps" = .srps_summary,
+    "scrps" = .srps_summary,
     # , "energy" = .energy
   )
 }
@@ -143,9 +140,9 @@ loo_pred_measure <- function(
     "mse" = .pointwise_squared_error,
     "acc" = .pointwise_accuracy,
     "balanced_acc" = .pointwise_accuracy,
-    "rps" = .rps,
-    "crps" = .rps,
-    "scrps" = .rps
+    "rps" = .pointwise_rps,
+    "crps" = .pointwise_rps,
+    "scrps" = .pointwise_rps
   )
 }
 
@@ -425,12 +422,12 @@ NULL
   )
 }
 
-#' CRPS
+#' Pointwise CRPS
 #'
 #' @noRd
 #' @param scaled logical. If true, computes SRPS/SCRPS
 #' @inheritParams pointwise_measure_params
-.rps <- function(y, ypred, log_weights, scaled) {
+.pointwise_rps <- function(y, ypred, log_weights, scaled) {
   if (is.null(log_weights)) {
     EXy <- mean(abs(y - ypred))
     y <- sort(y)
@@ -531,7 +528,7 @@ NULL
   pointwise <- vapply(
     seq_len(n),
     function(i) {
-      .rps(
+      .pointwise_rps(
         y[i],
         ypred[, i],
         log_weights[, i],
@@ -542,6 +539,12 @@ NULL
   )
 
   .simple_pointwise_summary(pointwise)
+}
+
+#' @noRd
+#' @inheritParams summary_measure_params
+.srps_summary <- function(y, ypred, log_weights) {
+  .rps_summary(y, ypred, log_weights, scaled = TRUE)
 }
 
 # ----------------------------- Helpers -----------------------------
