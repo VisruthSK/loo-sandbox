@@ -7,6 +7,7 @@ Authors@R:
 Description: Simple, temporary package to test new measure implementation
     for `loo`.
 License: MIT + file LICENSE
+URL: https://visruthsk.github.io/loo-sandbox/
 Imports:
     checkmate,
     matrixStats,
@@ -14,9 +15,10 @@ Imports:
     utils
 Suggests: 
     loo,
-    rstanarm,
     posterior,
+    rstanarm,
     testthat (>= 3.0.0)
+Config/Needs/website: stan-dev/pkgdown-config
 Config/testthat/edition: 3
 Config/testthat/parallel: true
 Encoding: UTF-8

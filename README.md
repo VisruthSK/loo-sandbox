@@ -1,5 +1,9 @@
 # loo-sandbox
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/VisruthSK/loo-sandbox/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/VisruthSK/loo-sandbox/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+
 ## Installation
 
 You can install the development version of loo-sandbox from [GitHub](https://github.com/VisruthSK/loo-sandbox) with:

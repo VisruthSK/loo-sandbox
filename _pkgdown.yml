@@ -1,0 +1,9 @@
+url: https://visruthsk.github.io/loo-sandbox/
+
+destination: "docs/"
+
+template:
+  package: pkgdownconfig
+
+development:
+  mode: auto

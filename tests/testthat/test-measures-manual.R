@@ -1,24 +1,3 @@
-roaches_manual_inputs <- local({
-  load_model <- function(id) {
-    fit <- readRDS(test_path("fits", sprintf("fit%d.RDS", id)))
-    y <- as.numeric(rstanarm::get_y(fit))
-    draws_pred <- rstanarm::posterior_predict(fit)
-    list(
-      y = y,
-      y_binary = as.integer(y > 0),
-      ypred = draws_pred,
-      mupred = rstanarm::posterior_epred(fit),
-      binary_mupred = ifelse(draws_pred > 0, 1L, 0L),
-      ylp = rstanarm::log_lik(fit)
-    )
-  }
-
-  list(
-    model1 = load_model(1),
-    model2 = load_model(2)
-  )
-})
-
 manual_equal_weights_se <- function(values) {
   n <- length(values)
   dm <- posterior::as_draws_matrix(matrix(values, ncol = 1))
@@ -241,8 +220,8 @@ manual_specs <- list(
 for (measure in names(manual_specs)) {
   spec <- manual_specs[[measure]]
   test_that(sprintf("manual %s matches loo_pred_measure", measure), {
-    for (model_name in names(roaches_manual_inputs)) {
-      inputs <- roaches_manual_inputs[[model_name]]
+    for (model_name in names(roaches_models)) {
+      inputs <- roaches_models[[model_name]]
       manual <- spec$prepare(inputs)
       args <- spec$call_args(inputs)
       result <- do.call(loo_pred_measure, args)
