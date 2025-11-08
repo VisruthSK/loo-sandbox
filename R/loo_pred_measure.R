@@ -1,3 +1,4 @@
+# TODO: document function--look at #281
 #' @export
 loo_pred_measure <- function(
   y = NULL,
@@ -26,8 +27,6 @@ loo_pred_measure <- function(
   psis_object = NULL,
   save_psis = FALSE
 ) {
-  # TODO: document function
-
   n <- length(y)
   # TODO: refactor this--ypred etc could be functions
   S <- if (!is.null(ypred)) {
@@ -78,7 +77,7 @@ loo_pred_measure <- function(
     args <- list(ylp)
   }
 
-  # provide equal weights or normalize given weights
+  # provide equal weights or normalize given log weights
   if (is.null(log_weights) || missing(log_weights)) {
     log_weights <- matrix(-log(S), nrow = S, ncol = n)
   } else {
@@ -107,8 +106,8 @@ loo_pred_measure <- function(
     "elpd" = .elpd_summary,
     "logscore" = .logscore_summary,
     "mlpd" = .logscore_summary,
-    "r2" = .r2_summary,
     "mae" = .mae_summary,
+    "r2" = .r2_summary,
     "rmse" = .rmse_summary,
     "mse" = .mse_summary,
     "acc" = .accuracy_summary,
@@ -134,14 +133,15 @@ loo_pred_measure <- function(
     "elpd" = .pointwise_elpd,
     "logscore" = .pointwise_elpd,
     "mlpd" = .pointwise_elpd,
-    "r2" = .pointwise_squared_error,
     "mae" = .pointwise_absolute_error,
+    "r2" = .pointwise_squared_error,
     "rmse" = .pointwise_squared_error,
     "mse" = .pointwise_squared_error,
     "acc" = .pointwise_accuracy,
     "balanced_acc" = .pointwise_accuracy,
     "rps" = .pointwise_rps,
     "crps" = .pointwise_rps,
+    "srps" = .pointwise_rps,
     "scrps" = .pointwise_rps
   )
 }
@@ -220,19 +220,25 @@ NULL
   y,
   mupred,
   log_weights,
-  pointwise = vapply(
-    seq_len(length(y)),
-    function(i) {
-      .pointwise_squared_error(
-        y[i],
-        mupred[, i],
-        log_weights[, i]
-      )
-    },
-    numeric(1)
-  )
+  pointwise = NULL
 ) {
-  .simple_pointwise_summary(pointwise)
+  .simple_pointwise_summary(
+    if (is.null(pointwise)) {
+      vapply(
+        seq_len(length(y)),
+        function(i) {
+          .pointwise_squared_error(
+            y[i],
+            mupred[, i],
+            log_weights[, i]
+          )
+        },
+        numeric(1)
+      )
+    } else {
+      pointwise
+    }
+  )
 }
 
 #' Root mean squared error
@@ -243,18 +249,23 @@ NULL
   y,
   mupred,
   log_weights,
-  pointwise = vapply(
-    seq_len(length(y)),
-    function(i) {
-      .pointwise_squared_error(
-        y[i],
-        mupred[, i],
-        log_weights[, i]
-      )
-    },
-    numeric(1)
-  )
+  pointwise = NULL
 ) {
+  pointwise <- if (is.null(pointwise)) {
+    vapply(
+      seq_len(length(y)),
+      function(i) {
+        .pointwise_squared_error(
+          y[i],
+          mupred[, i],
+          log_weights[, i]
+        )
+      },
+      numeric(1)
+    )
+  } else {
+    pointwise
+  }
   mean_mse <- mean(pointwise)
   list(
     estimate = sqrt(mean_mse),
@@ -271,23 +282,27 @@ NULL
   y,
   mupred,
   log_weights,
-  pointwise = vapply(
-    seq_len(length(y)),
-    function(i) {
-      .pointwise_squared_error(
-        y[i],
-        mupred[, i],
-        log_weights[, i]
-      )
-    },
-    numeric(1)
-  )
+  pointwise = NULL
 ) {
   n <- length(y)
+  pointwise <- if (is.null(pointwise)) {
+    vapply(
+      seq_len(n),
+      function(i) {
+        .pointwise_squared_error(
+          y[i],
+          mupred[, i],
+          log_weights[, i]
+        )
+      },
+      numeric(1)
+    )
+  } else {
+    pointwise
+  }
 
-  mse_loo_pointwise <- pointwise
-  mse_loo <- mean(mse_loo_pointwise)
-  se_mse_loo <- .se_helper(mse_loo_pointwise, mse_loo, n)
+  mse_loo <- mean(pointwise)
+  se_mse_loo <- .se_helper(pointwise, mse_loo, n)
 
   squared_error_y_pointwise <- (y - mean(y))^2
   mse_y <- mean(squared_error_y_pointwise)
@@ -296,7 +311,7 @@ NULL
     se_mse_loo^2 -
       2 *
         (mse_loo / mse_y) *
-        cov(mse_loo_pointwise, squared_error_y_pointwise) /
+        cov(pointwise, squared_error_y_pointwise) /
         n +
       (mse_loo^2 / mse_y^2) * var(squared_error_y_pointwise) / n
   ) /
@@ -305,7 +320,7 @@ NULL
   list(
     estimate = 1 - mse_loo / mse_y,
     se = se_r2,
-    pointwise = mse_loo_pointwise
+    pointwise = pointwise
   )
 }
 
@@ -386,22 +401,6 @@ NULL
   }
 }
 
-#' Log score
-#'
-#' @noRd
-#' @inheritParams summary_measure_params
-.logscore_summary <- function(ylp, log_weights) {
-  # TODO: rewrite to remove hard dep on R > 4.1.0
-  .elpd_summary(ylp, log_weights) |>
-    (\(l) {
-      n <- ncol(ylp)
-      modifyList(
-        l,
-        list(estimate = l$estimate / n, se = l$se / n)
-      )
-    })()
-}
-
 #' Expected log-predictive density
 #'
 #' @noRd
@@ -420,6 +419,16 @@ NULL
     se = n * .se_helper(pointwise, mean(pointwise), n),
     pointwise = pointwise
   )
+}
+
+#' Log score
+#'
+#' @noRd
+#' @inheritParams summary_measure_params
+.logscore_summary <- function(ylp, log_weights) {
+  n <- ncol(ylp)
+  l <- .elpd_summary(ylp, log_weights)
+  modifyList(l, list(estimate = l$estimate / n, se = l$se / n))
 }
 
 #' Pointwise CRPS

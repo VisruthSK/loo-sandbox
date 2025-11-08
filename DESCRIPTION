@@ -7,8 +7,6 @@ Authors@R:
 Description: Simple, temporary package to test new measure implementation
     for `loo`.
 License: MIT + file LICENSE
-Depends:
-  R (>= 4.1.0)
 Imports:
     checkmate,
     matrixStats,
@@ -20,6 +18,7 @@ Suggests:
     posterior,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Config/testthat/parallel: true
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
