@@ -1,4 +1,4 @@
-# TODO: document function--look at #281
+# TODO: document function--look at loo #281
 #' @export
 loo_pred_measure <- function(
   y = NULL,
