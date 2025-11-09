@@ -1,4 +1,19 @@
 # TODO: document function--look at loo #281
+#' LOO Predictive Measure
+#'
+#' @param y Placeholder
+#' @param ypred Placeholder
+#' @param mupred Placeholder
+#' @param ylp Placeholder
+#' @param loo Placeholder
+#' @param log_weights Placeholder
+#' @param measure Placeholder
+#' @param group_ids Placeholder
+#' @param psis_object Placeholder
+#' @param save_psis Placeholder
+#'
+#' @return Placeholder
+#'
 #' @export
 loo_pred_measure <- function(
   y = NULL,
@@ -53,7 +68,7 @@ loo_pred_measure <- function(
       )
   ) {
     checkmate::assert_matrix(mupred, nrows = S, ncols = n)
-    args <- list(y, mupred)
+    args <- list(y = y, mupred = mupred)
   } else if (
     measure %in%
       c(
@@ -65,7 +80,7 @@ loo_pred_measure <- function(
       )
   ) {
     checkmate::assert_matrix(ypred, nrows = S, ncols = n)
-    args <- list(y, ypred)
+    args <- list(y = y, ypred = ypred)
   } else if (
     measure %in%
       c(
@@ -74,7 +89,7 @@ loo_pred_measure <- function(
       )
   ) {
     checkmate::assert_matrix(ylp, nrows = S, ncols = n)
-    args <- list(ylp)
+    args <- list(ylp = ylp)
   }
 
   # provide equal weights or normalize given log weights
@@ -89,7 +104,22 @@ loo_pred_measure <- function(
     )
   }
 
-  do.call(pred_fun, append(args, list(log_weights)))
+  measure_values <- do.call(
+    pred_fun,
+    append(
+      args,
+      list(
+        log_weights = log_weights,
+        pointwise = if (!is.null(loo)) {
+          loo$pointwise[, .match_pointwise_column(measure)]
+        }
+      )
+    )
+  )
+
+  loo$pointwise[, .match_pointwise_column(measure)] <- measure_values$pointwise
+  unlist(measure_values[c("Estimate", "SE")])
+  measure_values
 }
 
 # ----------------------------- Measures -----------------------------
@@ -428,7 +458,11 @@ NULL
 .logscore_summary <- function(ylp, log_weights) {
   n <- ncol(ylp)
   l <- .elpd_summary(ylp, log_weights)
-  modifyList(l, list(estimate = l$estimate / n, se = l$se / n))
+  list(
+    estimate = l$estimate / n,
+    se = l$se / n,
+    pointwise = l$pointwise
+  )
 }
 
 #' Pointwise CRPS
