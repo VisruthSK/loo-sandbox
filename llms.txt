@@ -16,5 +16,12 @@ Note that this package is under MIT which is
 [compatible](https://interoperable-europe.ec.europa.eu/licence/compatibility-check/MIT/BSD-3-Clause)
 with BSD-3, so code can be wholly merged into `loo` when needed.
 
-# 
+# Package index
+
+## Main Functions
+
+Core functions for computing LOO predictive measures
+
+- [`loo_pred_measure()`](https://visruthsk.github.io/loo-sandbox/reference/loo_pred_measure.md)
+  : LOO Predictive Measure
 
