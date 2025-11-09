@@ -7,3 +7,9 @@ template:
 
 development:
   mode: auto
+
+reference:
+- title: "Main Functions"
+  desc: "Core functions for computing LOO predictive measures"
+  contents:
+  - loo_pred_measure

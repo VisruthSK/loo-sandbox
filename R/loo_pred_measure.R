@@ -104,21 +104,20 @@ loo_pred_measure <- function(
     )
   }
 
-  measure_values <- do.call(
-    pred_fun,
-    append(
-      args,
-      list(
-        log_weights = log_weights,
-        pointwise = if (!is.null(loo)) {
-          loo$pointwise[, .match_pointwise_column(measure)]
-        }
-      )
-    )
-  )
+  if (!is.null(loo)) {
+    args$pointwise <- loo$pointwise[, .match_pointwise_column(measure)]
+  }
+  args$log_weights <- log_weights
 
-  loo$pointwise[, .match_pointwise_column(measure)] <- measure_values$pointwise
+  measure_values <- do.call(pred_fun, args)
+
+  if (!is.null(loo)) {
+    loo$pointwise[, .match_pointwise_column(
+      measure
+    )] <- measure_values$pointwise
+  }
   unlist(measure_values[c("Estimate", "SE")])
+
   measure_values
 }
 
@@ -151,7 +150,6 @@ loo_pred_measure <- function(
   )
 }
 
-
 #' Identify pointwise function by `measure`
 #'
 #' @noRd
@@ -176,6 +174,30 @@ loo_pred_measure <- function(
   )
 }
 
+#' Match measure to pointwise column name
+#'
+#' @noRd
+#' @param measure The measure used.
+#' @return The column name in the loo pointwise matrix for the given measure.
+.match_pointwise_column <- function(measure) {
+  switch(
+    measure,
+    "elpd" = "elpd_loo",
+    "logscore" = "elpd_loo",
+    "mlpd" = "elpd_loo",
+    "mae" = "absolute_error_loo",
+    "r2" = "squared_error_loo",
+    "rmse" = "squared_error_loo",
+    "mse" = "squared_error_loo",
+    "acc" = "accuracy_loo",
+    "balanced_acc" = "accuracy_loo",
+    "rps" = "rps_loo",
+    "crps" = "rps_loo",
+    "srps" = "srps_loo",
+    "scrps" = "scrps_loo"
+  )
+}
+
 #' Shared parameters for pointwise functions
 #'
 #' @param y scalar, leave one out value
@@ -187,8 +209,6 @@ loo_pred_measure <- function(
 #' @keywords internal
 #' @name pointwise_measure_params
 NULL
-
-# Note that `pointwise` below is only for mse, rmse, and r2
 
 #' Shared parameters for summary functions
 #'
@@ -370,31 +390,42 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
-.accuracy_summary <- function(y, mupred, log_weights) {
+.accuracy_summary <- function(y, mupred, log_weights, pointwise = NULL) {
   checkmate::assert_subset(mupred, choices = c(0, 1))
-  .simple_pointwise_summary(vapply(
-    seq_len(length(y)),
-    function(i) {
-      .pointwise_accuracy(
-        y[i],
-        mupred[, i],
-        log_weights[, i]
+  .simple_pointwise_summary(
+    if (is.null(pointwise)) {
+      vapply(
+        seq_len(length(y)),
+        function(i) {
+          .pointwise_accuracy(
+            y[i],
+            mupred[, i],
+            log_weights[, i]
+          )
+        },
+        numeric(1)
       )
-    },
-    numeric(1)
-  ))
+    } else {
+      pointwise
+    }
+  )
 }
 
 #' Balanced classification accuracy
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
-.balanced_accuracy_summary <- function(y, mupred, log_weights) {
+.balanced_accuracy_summary <- function(
+  y,
+  mupred,
+  log_weights,
+  pointwise = NULL
+) {
   # TODO: check implementation again
   n <- length(y)
   cls_counts <- table(y)
 
-  .simple_pointwise_summary(
+  pointwise <- if (is.null(pointwise)) {
     vapply(
       seq_len(n),
       function(i) {
@@ -405,7 +436,13 @@ NULL
         )
       },
       numeric(1)
-    ) *
+    )
+  } else {
+    pointwise
+  }
+
+  .simple_pointwise_summary(
+    pointwise *
       n /
       (length(cls_counts) * as.numeric(cls_counts[match(y, names(cls_counts))]))
   )
@@ -435,15 +472,19 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
-.elpd_summary <- function(ylp, log_weights) {
+.elpd_summary <- function(ylp, log_weights, pointwise = NULL) {
   n <- ncol(ylp)
-  pointwise <- vapply(
-    seq_len(n),
-    function(i) {
-      .pointwise_elpd(ylp[, i], log_weights[, i])
-    },
-    numeric(1)
-  )
+  pointwise <- if (is.null(pointwise)) {
+    vapply(
+      seq_len(n),
+      function(i) {
+        .pointwise_elpd(ylp[, i], log_weights[, i])
+      },
+      numeric(1)
+    )
+  } else {
+    pointwise
+  }
   list(
     estimate = sum(pointwise),
     se = n * .se_helper(pointwise, mean(pointwise), n),
@@ -455,9 +496,9 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
-.logscore_summary <- function(ylp, log_weights) {
+.logscore_summary <- function(ylp, log_weights, pointwise = NULL) {
   n <- ncol(ylp)
-  l <- .elpd_summary(ylp, log_weights)
+  l <- .elpd_summary(ylp, log_weights, pointwise)
   list(
     estimate = l$estimate / n,
     se = l$se / n,
@@ -565,29 +606,39 @@ NULL
 #' @noRd
 #' @param scaled logical. If true, computes SRPS/SCRPS
 #' @inheritParams summary_measure_params
-.rps_summary <- function(y, ypred, log_weights, scaled = FALSE) {
+.rps_summary <- function(
+  y,
+  ypred,
+  log_weights,
+  scaled = FALSE,
+  pointwise = NULL
+) {
   n <- length(y)
 
-  pointwise <- vapply(
-    seq_len(n),
-    function(i) {
-      .pointwise_rps(
-        y[i],
-        ypred[, i],
-        log_weights[, i],
-        scaled
-      )
-    },
-    numeric(1)
-  )
+  pointwise <- if (is.null(pointwise)) {
+    vapply(
+      seq_len(n),
+      function(i) {
+        .pointwise_rps(
+          y[i],
+          ypred[, i],
+          log_weights[, i],
+          scaled
+        )
+      },
+      numeric(1)
+    )
+  } else {
+    pointwise
+  }
 
   .simple_pointwise_summary(pointwise)
 }
 
 #' @noRd
 #' @inheritParams summary_measure_params
-.srps_summary <- function(y, ypred, log_weights) {
-  .rps_summary(y, ypred, log_weights, scaled = TRUE)
+.srps_summary <- function(y, ypred, log_weights, pointwise = NULL) {
+  .rps_summary(y, ypred, log_weights, scaled = TRUE, pointwise = pointwise)
 }
 
 # ----------------------------- Helpers -----------------------------
