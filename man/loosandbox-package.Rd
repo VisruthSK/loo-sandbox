@@ -8,6 +8,13 @@
 \description{
 Simple, temporary package to test new measure implementation for `loo`.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://visruthsk.github.io/loo-sandbox/}
+}
+
+}
 \author{
 \strong{Maintainer}: Visruth Srimath Kandali \email{public@visruth.com} (\href{https://orcid.org/0009-0005-9097-0688}{ORCID})
 
