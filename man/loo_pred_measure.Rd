@@ -9,13 +9,10 @@ loo_pred_measure(
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
-  loo = NULL,
-  log_weights = NULL,
+  loo,
   measure = c("logscore", "elpd", "r2", "rps", "crps", "srps", "scrps", "mae", "rmse",
     "mse", "acc", "balanced_acc"),
-  group_ids = NULL,
-  psis_object = NULL,
-  save_psis = FALSE
+  group_ids = NULL
 )
 }
 \arguments{
@@ -29,11 +26,11 @@ loo_pred_measure(
 
 \item{loo}{Placeholder}
 
-\item{log_weights}{Placeholder}
-
 \item{measure}{Placeholder}
 
 \item{group_ids}{Placeholder}
+
+\item{log_weights}{Placeholder}
 
 \item{psis_object}{Placeholder}
 

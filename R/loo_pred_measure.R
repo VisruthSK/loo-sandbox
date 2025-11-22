@@ -6,11 +6,8 @@
 #' @param mupred Placeholder
 #' @param ylp Placeholder
 #' @param loo Placeholder
-#' @param log_weights Placeholder
 #' @param measure Placeholder
 #' @param group_ids Placeholder
-#' @param psis_object Placeholder
-#' @param save_psis Placeholder
 #'
 #' @return Placeholder
 #'
@@ -20,15 +17,14 @@ loo_pred_measure <- function(
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
-  loo = NULL,
-  log_weights = NULL,
+  loo, # This `loo` object needs to be fit with `save_psis = TRUE`
   measure = c(
     "logscore",
-    "elpd",
+    "elpd", # TODO: note that this is stored in `loo` object already
     "r2",
     "rps",
     "crps",
-    # TODO: is srps option needed
+    # TODO: is srps option needed; ask Aki
     "srps",
     "scrps",
     "mae",
@@ -38,12 +34,12 @@ loo_pred_measure <- function(
     # "energy",
     "balanced_acc"
   ),
-  group_ids = NULL,
-  psis_object = NULL,
-  save_psis = FALSE
+  group_ids = NULL
+  # ,psis_object = NULL,
+  # save_psis = FALSE
 ) {
   n <- length(y)
-  # TODO: refactor this--ypred etc could be functions
+  # TODO: refactor this--ypred etc could be functions; ask Aki. Could maybe use S7 multiple dispatch?
   S <- if (!is.null(ypred)) {
     nrow(ypred)
   } else if (!is.null(ylp)) {
@@ -92,36 +88,51 @@ loo_pred_measure <- function(
     args <- list(ylp = ylp)
   }
 
-  # provide equal weights or normalize given log weights
-  if (is.null(log_weights) || missing(log_weights)) {
-    log_weights <- matrix(-log(S), nrow = S, ncol = n)
+  # TODO: get logweights from `psis` obj or making them
+  # Aki said: The arguments are the same except instead of predperf object, loo or psis object can be given. If neither of these is given, but ylp is given then that works as log_lik and psis object is created internally. save_psis would control whether the psis_object is also stored in the returned object.
+
+  psis <- loo$psis_object
+  if (is.null(psis) || !is.psis(psis)) {
+    stop(
+      "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
+    )
   } else {
+    log_weights <- weights(psis)
     checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
-    log_weights <- sweep(
+    args$log_weights <- sweep(
       log_weights,
       2,
       matrixStats::colLogSumExps(log_weights)
     )
   }
 
+  # TODO: CHECK EVERYTHING WITH AKI; ask Aki
+
   if (!is.null(loo)) {
-    args$pointwise <- loo$pointwise[, .match_pointwise_column(measure)]
+    args$pointwise <- tryCatch(
+      loo$pointwise[, .match_pointwise_column(measure)],
+      error = function(e) NULL
+    )
   }
-  args$log_weights <- log_weights
 
   measure_values <- do.call(pred_fun, args)
 
-  if (!is.null(loo)) {
-    loo$pointwise[, .match_pointwise_column(
-      measure
-    )] <- measure_values$pointwise
-  }
-  unlist(measure_values[c("Estimate", "SE")])
+  # TODO: add diagnostics? need loo object for that though
 
+  # TODO: return new object
+  structure(
+    c(
+      measure_values,
+      loo = loo
+    ),
+    class = c("loo_pred_measure", "pred_measure")
+  )
   measure_values
 }
 
 # ----------------------------- Measures -----------------------------
+
+# TODO: SEs are for LOO estimates--how to work for insample results?
 
 #' Identify measure function function by `measure`
 #'
@@ -224,6 +235,9 @@ NULL
 #' @name summary_measure_params
 NULL
 
+# TODO: write export wrappers--wrappers should do arg checking, have documentation, etc.
+# TODO: take pointwise values from loo object--wrapper function shouldn't expose `pointwise`s
+
 # ----------------------------- Metrics -----------------------------
 
 #' Pointwise absolute error
@@ -259,8 +273,6 @@ NULL
     numeric(1)
   ))
 }
-
-# TODO: take pointwise values from loo object--wrapper function shouldn't expose `pointwise`
 
 #' Mean squared error
 #'
@@ -643,7 +655,6 @@ NULL
 
 # ----------------------------- Helpers -----------------------------
 
-# TODO: weights always provided
 #' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
 #'
 #' @noRd
