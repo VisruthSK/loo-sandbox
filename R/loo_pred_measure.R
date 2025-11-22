@@ -11,6 +11,7 @@
 #'
 #' @return Placeholder
 #'
+#' @importFrom stats weights
 #' @export
 loo_pred_measure <- function(
   y = NULL,
@@ -99,11 +100,7 @@ loo_pred_measure <- function(
   } else {
     log_weights <- weights(psis)
     checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
-    args$log_weights <- sweep(
-      log_weights,
-      2,
-      matrixStats::colLogSumExps(log_weights)
-    )
+    args$log_weights <- .standardize_log_weights(log_weights)
   }
 
   # TODO: CHECK EVERYTHING WITH AKI; ask Aki
@@ -209,41 +206,11 @@ loo_pred_measure <- function(
   )
 }
 
-#' Shared parameters for pointwise functions
-#'
-#' @param y scalar, leave one out value
-#' @param ypred vector (S) of posterior predictive draws
-#' @param ylp vector (S) of pointwise LOO log predictive densities
-#' @param mupred vector (S) of point predictions
-#' @param log_weights vector of loo weights (S) on the log scale
-#'
-#' @keywords internal
-#' @name pointwise_measure_params
-NULL
-
-#' Shared parameters for summary functions
-#'
-#' @param y vector of observed values (n)
-#' @param ypred matrix of posterior draws (S x n) of posterior predictive draws
-#' @param ylp matrix of posterior draws (S x n) of pointwise LOO log predictive densities
-#' @param mupred matrix of posterior draws (S x n) of point predictions
-#' @param log_weights matrix of loo weights (S x n) on the log scale
-#'
-#' @param pointwise optional precomputed pointwise squared errors (n)
-#'
-#' @keywords internal
-#' @name summary_measure_params
-NULL
-
-# TODO: write export wrappers--wrappers should do arg checking, have documentation, etc.
-# TODO: take pointwise values from loo object--wrapper function shouldn't expose `pointwise`s
-
-# ----------------------------- Metrics -----------------------------
-
 #' Pointwise absolute error
 #'
 #' @noRd
 #' @inheritParams pointwise_measure_params
+#' @inheritSection pointwise_measure_params Assumptions
 .pointwise_absolute_error <- function(y, mupred, log_weights) {
   abs(y - .loo_weighted_mean(mupred, log_weights))
 }
@@ -252,6 +219,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams pointwise_measure_params
+#' @inheritSection pointwise_measure_params Assumptions
 .pointwise_squared_error <- function(y, mupred, log_weights) {
   (y - .loo_weighted_mean(mupred, log_weights))^2
 }
@@ -260,6 +228,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .mae_summary <- function(y, mupred, log_weights) {
   .simple_pointwise_summary(vapply(
     seq_len(length(y)),
@@ -278,6 +247,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .mse_summary <- function(
   y,
   mupred,
@@ -307,6 +277,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .rmse_summary <- function(
   y,
   mupred,
@@ -340,6 +311,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .r2_summary <- function(
   y,
   mupred,
@@ -392,6 +364,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams pointwise_measure_params
+#' @inheritSection pointwise_measure_params Assumptions
 .pointwise_accuracy <- function(y, mupred, log_weights) {
   .loo_weighted_mean(mupred == y, log_weights)
 }
@@ -402,6 +375,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .accuracy_summary <- function(y, mupred, log_weights, pointwise = NULL) {
   checkmate::assert_subset(mupred, choices = c(0, 1))
   .simple_pointwise_summary(
@@ -427,6 +401,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .balanced_accuracy_summary <- function(
   y,
   mupred,
@@ -472,6 +447,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams pointwise_measure_params
+#' @inheritSection pointwise_measure_params Assumptions
 .pointwise_elpd <- function(ylp, log_weights) {
   if (is.null(log_weights)) {
     matrixStats::logSumExp(ylp) - log(length(ylp))
@@ -484,6 +460,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .elpd_summary <- function(ylp, log_weights, pointwise = NULL) {
   n <- ncol(ylp)
   pointwise <- if (is.null(pointwise)) {
@@ -508,6 +485,7 @@ NULL
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .logscore_summary <- function(ylp, log_weights, pointwise = NULL) {
   n <- ncol(ylp)
   l <- .elpd_summary(ylp, log_weights, pointwise)
@@ -523,6 +501,7 @@ NULL
 #' @noRd
 #' @param scaled logical. If true, computes SRPS/SCRPS
 #' @inheritParams pointwise_measure_params
+#' @inheritSection pointwise_measure_params Assumptions
 .pointwise_rps <- function(y, ypred, log_weights, scaled) {
   if (is.null(log_weights)) {
     EXy <- mean(abs(y - ypred))
@@ -549,75 +528,10 @@ NULL
   rps
 }
 
-#' (Continuous) Ranked Probability Score
-#'
-#' Given draws ypred from the predictive distribution and the observations y,
-#' computes
-#'   - rank probability score (Epstein, 1969) for discrete ypred and y and
-#'     continuous rank probability score (Matheson and Winkler, 1976;
-#'     Gneiting & Raftery, 2007) for continuous ypred and y, using the
-#'     probability weighted moment form (Taillardat et al., 2016;
-#'     Zamo & Naveau, 2017)
-#'   - scaled versions of these, if `scaled=TRUE` (Bolin & Wallin, 2023).
-#'
-#' Utility version of the score is returned, that is, bigger is
-#' better, to match the utility version of log score / elpd (the original
-#' rank probability score by Epstein (1969) was also in this direction).
-#'
-#' The same sample based $L$-moment estimator is used for continuous and
-#' discrete variables. It is commonly stated that the probability
-#' weighted moment form assumes F(x) is continuous. However, Hosking
-#' (1990) states that $L$-moments can be used with discrete
-#' distributions ``provided that the quantile function is `normalized'
-#' in the sense of Widder (1941).''  Hosking (1996) states the same
-#' condition more simply as ``A discrete random variable can be
-#' approximated arbitrarily closely by a continuous random variable,
-#' so the result is also valid for discrete random variables''.
-#'
-#' @references
-#' \itemize{
-#'   \item Bolin, D. and Wallin, J. (2023). Local scale invariance and
-#'   robustness of proper scoring rules. \emph{Statistical Science},
-#'   38(1):140-159.
-#'
-#'   \item Epstein, E.S. (1969). A scoring system for probability
-#'   forecasts of ranked categories. \emph{Journal of Applied Meteorology},
-#'   8(6):985-987.
-#'
-#'   \item Gneiting, T. and Raftery, A.E. (2007). Strictly Proper
-#'   Scoring Rules, Prediction, and Estimation. \emph{Journal of the
-#'   American Statistical Association}, 102(477):359-378.
-#'
-#'   \item Hosking, J.R.M. (1990). $L$-moments: analysis and estimation
-#'   of distributions using linear combinations of order statistics.
-#'   \emph{Journal of the Royal Statistical Society Series B: Statistical
-#'   Methodology}, 52(1):105-124.
-#'
-#'   \item Hosking, J.R.M. (1996). Some theoretical results concerning
-#'   $L$-moments. Research report RC 14492. IBM Thomas J. Watson Research
-#'   Division.
-#'
-#'   \item Matheson, J.E., and Winkler, R.L. (1976). Scoring Rules for
-#'   Continuous Probability Distributions. \emph{Management Science},
-#'   22(10), 1087-1096.
-#'
-#'   \item Taillardat, M., Mestre, O., Zamo, M., and Naveau, P. (2016).
-#'   Calibrated Ensemble Forecasts Using Quantile Regression Forests and
-#'   Ensemble Model Output Statistics. \emph{Monthly Weather Review},
-#'   144(6), 2375-2393.
-#'
-#'   \item Widder, D.V. (1941). \emph{The Laplace Transform}. Princeton:
-#'   Princeton University Press.
-#'
-#'   \item Zamo, M., and Naveau, P. (2018). Estimation of the Continuous
-#'   Ranked Probability Score with Limited Information and Applications
-#'   to Ensemble Weather Forecasts. \emph{Mathematical Geosciences},
-#'   50, 209–234.
-#' }
-#'
 #' @noRd
 #' @param scaled logical. If true, computes SRPS/SCRPS
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .rps_summary <- function(
   y,
   ypred,
@@ -649,6 +563,7 @@ NULL
 
 #' @noRd
 #' @inheritParams summary_measure_params
+#' @inheritSection summary_measure_params Assumptions
 .srps_summary <- function(y, ypred, log_weights, pointwise = NULL) {
   .rps_summary(y, ypred, log_weights, scaled = TRUE, pointwise = pointwise)
 }
@@ -675,5 +590,13 @@ NULL
     estimate = est,
     se = .se_helper(pointwise, est, length(pointwise)),
     pointwise = pointwise
+  )
+}
+
+.standardize_log_weights <- function(log_weights) {
+  sweep(
+    log_weights,
+    2,
+    matrixStats::colLogSumExps(log_weights)
   )
 }

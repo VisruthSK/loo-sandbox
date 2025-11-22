@@ -7,14 +7,12 @@ roaches_models <- local({
     mupred <- rstanarm::posterior_epred(fit)
     ypred <- rstanarm::posterior_predict(fit)
     S <- nrow(mupred)
-    log_weights_equal <- matrix(-log(S), nrow = S, ncol = length(y))
     list(
       y = y,
       y_binary = as.integer(y > 0),
       ypred = ypred,
       mupred = mupred,
       binary_mupred = ifelse(ypred > 0, 1L, 0L),
-      log_weights = log_weights_equal,
       loo = loo_obj,
       ylp = rstanarm::log_lik(fit)
     )

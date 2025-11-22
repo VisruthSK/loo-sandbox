@@ -29,12 +29,6 @@ loo_pred_measure(
 \item{measure}{Placeholder}
 
 \item{group_ids}{Placeholder}
-
-\item{log_weights}{Placeholder}
-
-\item{psis_object}{Placeholder}
-
-\item{save_psis}{Placeholder}
 }
 \value{
 Placeholder
