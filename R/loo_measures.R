@@ -1,35 +1,3 @@
-#' Shared parameters for pointwise functions
-#'
-#' @param y scalar, leave one out value
-#' @param ypred vector (S) of posterior predictive draws
-#' @param ylp vector (S) of pointwise LOO log predictive densities
-#' @param mupred vector (S) of point predictions
-#' @param log_weights vector of loo weights (S) on the log scale
-#'
-#' @section Assumptions:
-#' Assumes log_weights are standardized. Assumes `y` is a scalar and `mupred`, `ypred`, `ylp`, and `log_weights` are vectors of length `S`.
-#'
-#' @keywords internal
-#' @name pointwise_measure_params
-NULL
-
-#' Shared parameters for summary functions
-#'
-#' @param y vector of observed values (n)
-#' @param ypred matrix of posterior draws (S x n) of posterior predictive draws
-#' @param ylp matrix of posterior draws (S x n) of pointwise LOO log predictive densities
-#' @param mupred matrix of posterior draws (S x n) of point predictions
-#' @param log_weights matrix of loo weights (S x n) on the log scale
-#'
-#' @param pointwise optional precomputed pointwise squared errors (n)
-#'
-#' @section Assumptions:
-#' Assumes log_weights are standardized. Assumes `y` is a vector of length `n` and `mupred`, `ypred`, `ylp`, and `log_weights` are matrices of size `S x n`.
-#'
-#' @keywords internal
-#' @name summary_measure_params
-NULL
-
 #' Mean squared error
 #'
 #' @inheritParams summary_measure_params
@@ -38,7 +6,7 @@ NULL
 mse <- function(y, mupred, log_weights) {
   n <- length(y)
   S <- nrow(mupred)
-  checkmate::assert_matrix(mupred, nrows = S, ncols = n)
+  checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -47,7 +15,12 @@ mse <- function(y, mupred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .mse_summary(y, mupred, log_weights, pointwise = NULL)
+  .mse_summary(
+    y = y,
+    mupred = mupred,
+    log_weights = log_weights,
+    pointwise = NULL
+  )
 }
 
 #' Root mean squared error
@@ -58,7 +31,7 @@ mse <- function(y, mupred, log_weights) {
 rmse <- function(y, mupred, log_weights) {
   n <- length(y)
   S <- nrow(mupred)
-  checkmate::assert_matrix(mupred, nrows = S, ncols = n)
+  checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -67,7 +40,12 @@ rmse <- function(y, mupred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .rmse_summary(y, mupred, log_weights, pointwise = NULL)
+  .rmse_summary(
+    y = y,
+    mupred = mupred,
+    log_weights = log_weights,
+    pointwise = NULL
+  )
 }
 
 #' Mean absolute error
@@ -78,7 +56,7 @@ rmse <- function(y, mupred, log_weights) {
 mae <- function(y, mupred, log_weights) {
   n <- length(y)
   S <- nrow(mupred)
-  checkmate::assert_matrix(mupred, nrows = S, ncols = n)
+  checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -87,7 +65,7 @@ mae <- function(y, mupred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .mae_summary(y, mupred, log_weights)
+  .mae_summary(y = y, mupred = mupred, log_weights = log_weights)
 }
 
 #' R^2
@@ -98,7 +76,7 @@ mae <- function(y, mupred, log_weights) {
 r2 <- function(y, mupred, log_weights) {
   n <- length(y)
   S <- nrow(mupred)
-  checkmate::assert_matrix(mupred, nrows = S, ncols = n)
+  checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -107,7 +85,12 @@ r2 <- function(y, mupred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .r2_summary(y, mupred, log_weights, pointwise = NULL)
+  .r2_summary(
+    y = y,
+    mupred = mupred,
+    log_weights = log_weights,
+    pointwise = NULL
+  )
 }
 
 #' Classification accuracy
@@ -118,7 +101,7 @@ r2 <- function(y, mupred, log_weights) {
 acc <- function(y, mupred, log_weights) {
   n <- length(y)
   S <- nrow(mupred)
-  checkmate::assert_matrix(mupred, nrows = S, ncols = n)
+  checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -127,7 +110,12 @@ acc <- function(y, mupred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .accuracy_summary(y, mupred, log_weights, pointwise = NULL)
+  .accuracy_summary(
+    y = y,
+    mupred = mupred,
+    log_weights = log_weights,
+    pointwise = NULL
+  )
 }
 
 #' Balanced classification accuracy
@@ -138,7 +126,7 @@ acc <- function(y, mupred, log_weights) {
 balanced_acc <- function(y, mupred, log_weights) {
   n <- length(y)
   S <- nrow(mupred)
-  checkmate::assert_matrix(mupred, nrows = S, ncols = n)
+  checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -147,7 +135,12 @@ balanced_acc <- function(y, mupred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .balanced_accuracy_summary(y, mupred, log_weights, pointwise = NULL)
+  .balanced_accuracy_summary(
+    y = y,
+    mupred = mupred,
+    log_weights = log_weights,
+    pointwise = NULL
+  )
 }
 
 #' Expected log-predictive density
@@ -158,7 +151,7 @@ balanced_acc <- function(y, mupred, log_weights) {
 elpd <- function(ylp, log_weights) {
   n <- ncol(ylp)
   S <- nrow(ylp)
-  checkmate::assert_matrix(ylp, nrows = S, ncols = n)
+  checkmate::assert_matrix(ylp, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -167,7 +160,7 @@ elpd <- function(ylp, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .elpd_summary(ylp, log_weights, pointwise = NULL)
+  .elpd_summary(ylp = ylp, log_weights = log_weights, pointwise = NULL)
 }
 
 #' Log score
@@ -178,7 +171,7 @@ elpd <- function(ylp, log_weights) {
 logscore <- function(ylp, log_weights) {
   n <- ncol(ylp)
   S <- nrow(ylp)
-  checkmate::assert_matrix(ylp, nrows = S, ncols = n)
+  checkmate::assert_matrix(ylp, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -187,7 +180,7 @@ logscore <- function(ylp, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .logscore_summary(ylp, log_weights, pointwise = NULL)
+  .logscore_summary(ylp = ylp, log_weights = log_weights, pointwise = NULL)
 }
 
 #' (Continuous) Ranked Probability Score
@@ -262,7 +255,7 @@ logscore <- function(ylp, log_weights) {
 rps <- function(y, ypred, log_weights) {
   n <- length(y)
   S <- nrow(ypred)
-  checkmate::assert_matrix(ypred, nrows = S, ncols = n)
+  checkmate::assert_matrix(ypred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -271,24 +264,31 @@ rps <- function(y, ypred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .rps_summary(y, ypred, log_weights, scaled = FALSE, pointwise = NULL)
+  .rps_summary(
+    y = y,
+    ypred = ypred,
+    log_weights = log_weights,
+    scaled = FALSE,
+    pointwise = NULL
+  )
 }
 
+#' Continuous Ranked Probability Score
+#'
 #' @rdname rps
 #' @export
 crps <- function(y, ypred, log_weights) {
   rps(y, ypred, log_weights)
 }
 
-#' Scaled (Continuous) Ranked Probability Score
+#' Scaled Ranked Probability Score
 #'
-#' @inheritParams summary_measure_params
-#'
+#' @rdname rps
 #' @export
 srps <- function(y, ypred, log_weights) {
   n <- length(y)
   S <- nrow(ypred)
-  checkmate::assert_matrix(ypred, nrows = S, ncols = n)
+  checkmate::assert_matrix(ypred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
   log_weights <- sweep(
@@ -297,13 +297,17 @@ srps <- function(y, ypred, log_weights) {
     matrixStats::colLogSumExps(log_weights)
   )
 
-  .srps_summary(y, ypred, log_weights, pointwise = NULL)
+  .srps_summary(
+    y = y,
+    ypred = ypred,
+    log_weights = log_weights,
+    pointwise = NULL
+  )
 }
 
-#' Scaled (Continuous) Ranked Probability Score
+#' Scaled Continuous Ranked Probability Score
 #'
-#' @inheritParams summary_measure_params
-#'
+#' @rdname rps
 #' @export
 scrps <- function(y, ypred, log_weights) {
   srps(y, ypred, log_weights)

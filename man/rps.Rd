@@ -3,18 +3,24 @@
 \name{rps}
 \alias{rps}
 \alias{crps}
+\alias{srps}
+\alias{scrps}
 \title{(Continuous) Ranked Probability Score}
 \usage{
 rps(y, ypred, log_weights)
 
 crps(y, ypred, log_weights)
+
+srps(y, ypred, log_weights)
+
+scrps(y, ypred, log_weights)
 }
 \arguments{
 \item{y}{vector of observed values (n)}
 
 \item{ypred}{matrix of posterior draws (S x n) of posterior predictive draws}
 
-\item{log_weights}{matrix of loo weights (S x n) on the log scale}
+\item{log_weights}{matrix of standardized loo weights (S x n) on the log scale}
 }
 \description{
 Given draws ypred from the predictive distribution and the observations y,

@@ -11,7 +11,6 @@
 #'
 #' @return Placeholder
 #'
-#' @importFrom stats weights
 #' @export
 loo_pred_measure <- function(
   y = NULL,
@@ -205,6 +204,40 @@ loo_pred_measure <- function(
     "scrps" = "scrps_loo"
   )
 }
+
+#' Shared parameters for pointwise functions
+#'
+#' @param y scalar, leave one out value
+#' @param ypred vector (S) of posterior predictive draws
+#' @param ylp vector (S) of pointwise LOO log predictive densities
+#' @param mupred vector (S) of point predictions
+#' @param log_weights vector of standardized loo weights (S) on the log scale
+#'
+#' @section Assumptions:
+#' `log_weights` are on the log scale and standardized. `y` is a scalar and any relevant amongst `mupred`, `ypred`, `ylp`, and `log_weights` are vectors of length `S`.
+#'
+#' @keywords internal
+#' @name pointwise_measure_params
+NULL
+
+#' Shared parameters for summary functions
+#'
+#' @param y vector of observed values (n)
+#' @param ypred matrix of posterior draws (S x n) of posterior predictive draws
+#' @param ylp matrix of posterior draws (S x n) of pointwise LOO log predictive densities
+#' @param mupred matrix of posterior draws (S x n) of point predictions
+#' @param log_weights matrix of standardized loo weights (S x n) on the log scale
+#'
+#' @param pointwise optional precomputed pointwise squared errors (n)
+#'
+#' @section Assumptions:
+#' `log_weights` are on the log scale and standardized. `y` is a vector of length `n` and any relevant amongst `mupred`, `ypred`, `ylp`, and `log_weights` are matrices of size `S x n`.
+#'
+#' @keywords internal
+#' @name summary_measure_params
+NULL
+
+# ----------------------------- Metrics -----------------------------
 
 #' Pointwise absolute error
 #'
@@ -565,7 +598,13 @@ loo_pred_measure <- function(
 #' @inheritParams summary_measure_params
 #' @inheritSection summary_measure_params Assumptions
 .srps_summary <- function(y, ypred, log_weights, pointwise = NULL) {
-  .rps_summary(y, ypred, log_weights, scaled = TRUE, pointwise = pointwise)
+  .rps_summary(
+    y = y,
+    ypred = ypred,
+    log_weights = log_weights,
+    scaled = TRUE,
+    pointwise = pointwise
+  )
 }
 
 # ----------------------------- Helpers -----------------------------

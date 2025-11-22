@@ -11,7 +11,7 @@ rmse(y, mupred, log_weights)
 
 \item{mupred}{matrix of posterior draws (S x n) of point predictions}
 
-\item{log_weights}{matrix of loo weights (S x n) on the log scale}
+\item{log_weights}{matrix of standardized loo weights (S x n) on the log scale}
 }
 \description{
 Root mean squared error
