@@ -93,15 +93,22 @@
 
 
 <dt id="arg-log-weights">log_weights<a class="anchor" aria-label="anchor" href="#arg-log-weights"></a></dt>
-<dd><p>matrix of loo weights (S x n) on the log scale</p></dd>
+<dd><p>matrix of standardized loo weights (S x n) on the log scale</p></dd>
 
 
 <dt id="arg-pointwise">pointwise<a class="anchor" aria-label="anchor" href="#arg-pointwise"></a></dt>
 <dd><p>optional precomputed pointwise squared errors (n)</p></dd>
 
 </dl></div>
+    <div class="section level2">
+    <h2 id="assumptions">Assumptions<a class="anchor" aria-label="anchor" href="#assumptions"></a></h2>
 
-  </main></div>
+
+<p><code>log_weights</code> are on the log scale and standardized. <code>y</code> is a vector of length <code>n</code> and any relevant amongst <code>mupred</code>, <code>ypred</code>, <code>ylp</code>, and <code>log_weights</code> are matrices of size <code>S x n</code>.</p>
+    </div>
+
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

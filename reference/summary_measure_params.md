@@ -23,8 +23,14 @@ Shared parameters for summary functions
 
 - log_weights:
 
-  matrix of loo weights (S x n) on the log scale
+  matrix of standardized loo weights (S x n) on the log scale
 
 - pointwise:
 
   optional precomputed pointwise squared errors (n)
+
+## Assumptions
+
+`log_weights` are on the log scale and standardized. `y` is a vector of
+length `n` and any relevant amongst `mupred`, `ypred`, `ylp`, and
+`log_weights` are matrices of size `S x n`.
