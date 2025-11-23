@@ -13,3 +13,14 @@ reference:
   desc: "Core functions for computing LOO predictive measures"
   contents:
   - starts_with("loo_")
+- title: "Measures"
+  contents:
+  - acc
+  - balanced_acc
+  - elpd
+  - logscore
+  - mae
+  - mse
+  - r2
+  - rmse
+  - rps
