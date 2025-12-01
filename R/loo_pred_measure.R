@@ -49,6 +49,7 @@ loo_pred_measure <- function(
   }
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
+  pointwise_col <- .match_pointwise_column(measure)
 
   # check appropriate arguments for measure
   if (
@@ -112,11 +113,15 @@ loo_pred_measure <- function(
 
   measure_values <- do.call(pred_fun, args)
 
-  # TODO: should we putting pointwise values back into loo object?
-  if (!is.null(loo)) {
-    loo$pointwise[, .match_pointwise_column(
-      measure
-    )] <- measure_values$pointwise
+  # TODO: should we be putting pointwise values back into loo object?
+  if (
+    !is.null(loo) &&
+      !is.null(pointwise_col) &&
+      !(pointwise_col %in% colnames(loo$pointwise))
+  ) {
+    new_col <- matrix(measure_values$pointwise, ncol = 1)
+    colnames(new_col) <- pointwise_col
+    loo$pointwise <- cbind(loo$pointwise, new_col)
   }
   # TODO: add diagnostics? need loo object for that though
 
@@ -268,17 +273,19 @@ NULL
 #' @inheritParams summary_measure_params
 #' @inheritSection summary_measure_params Assumptions
 .mae_summary <- function(y, mupred, log_weights) {
-  .simple_pointwise_summary(vapply(
-    seq_len(length(y)),
-    function(i) {
-      .pointwise_absolute_error(
-        y[i],
-        mupred[, i],
-        log_weights[, i]
-      )
-    },
-    numeric(1)
-  ))
+  .simple_pointwise_summary(
+    vapply(
+      seq_len(length(y)),
+      function(i) {
+        .pointwise_absolute_error(
+          y[i],
+          mupred[, i],
+          log_weights[, i]
+        )
+      },
+      numeric(1)
+    )
+  )
 }
 
 #' Mean squared error
@@ -292,23 +299,22 @@ NULL
   log_weights,
   pointwise = NULL
 ) {
-  .simple_pointwise_summary(
-    if (is.null(pointwise)) {
-      vapply(
-        seq_len(length(y)),
-        function(i) {
-          .pointwise_squared_error(
-            y[i],
-            mupred[, i],
-            log_weights[, i]
-          )
-        },
-        numeric(1)
-      )
-    } else {
-      pointwise
-    }
-  )
+  pointwise <- if (is.null(pointwise)) {
+    vapply(
+      seq_len(length(y)),
+      function(i) {
+        .pointwise_squared_error(
+          y[i],
+          mupred[, i],
+          log_weights[, i]
+        )
+      },
+      numeric(1)
+    )
+  } else {
+    pointwise
+  }
+  .simple_pointwise_summary(pointwise)
 }
 
 #' Root mean squared error
@@ -416,23 +422,23 @@ NULL
 #' @inheritSection summary_measure_params Assumptions
 .accuracy_summary <- function(y, mupred, log_weights, pointwise = NULL) {
   checkmate::assert_subset(mupred, choices = c(0, 1))
-  .simple_pointwise_summary(
-    if (is.null(pointwise)) {
-      vapply(
-        seq_len(length(y)),
-        function(i) {
-          .pointwise_accuracy(
-            y[i],
-            mupred[, i],
-            log_weights[, i]
-          )
-        },
-        numeric(1)
-      )
-    } else {
-      pointwise
-    }
-  )
+  pointwise <- if (is.null(pointwise)) {
+    vapply(
+      seq_len(length(y)),
+      function(i) {
+        .pointwise_accuracy(
+          y[i],
+          mupred[, i],
+          log_weights[, i]
+        )
+      },
+      numeric(1)
+    )
+  } else {
+    pointwise
+  }
+
+  .simple_pointwise_summary(pointwise)
 }
 
 #' Balanced classification accuracy
@@ -527,6 +533,7 @@ NULL
 .logscore_summary <- function(ylp, log_weights, pointwise = NULL) {
   n <- ncol(ylp)
   l <- .elpd_summary(ylp, log_weights, pointwise)
+  # tranformation of elpd estimates, same pointwise values
   list(
     estimate = l$estimate / n,
     se = l$se / n,
@@ -614,20 +621,24 @@ NULL
 
 # ----------------------------- Helpers -----------------------------
 
+#' Weighted Mean
+#'
 #' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
 #'
 #' @noRd
-#' @param x vector to take mean of
-#' @param log_weights log weights
-#' @return weighted mean of `x`
 .loo_weighted_mean <- function(x, log_weights) {
   sum(x * exp(log_weights - matrixStats::logSumExp(log_weights)))
 }
 
-.se_helper <- function(x, x_mean, n) {
-  sqrt(sum((x - x_mean)^2) / (n * (n - 1)))
+.se_helper <- function(x, xbar, n) {
+  sqrt(sum((x - xbar)^2) / (n * (n - 1)))
 }
 
+#' Simple Summary
+#'
+#' Function to get common estimate and associated SE.
+#'
+#' @noRd
 .simple_pointwise_summary <- function(pointwise) {
   est <- mean(pointwise)
   list(
@@ -641,6 +652,8 @@ NULL
   sweep(
     log_weights,
     2,
-    matrixStats::colLogSumExps(log_weights)
+    matrixStats::colLogSumExps(log_weights),
+    FUN = "-",
+    check.margin = FALSE
   )
 }
