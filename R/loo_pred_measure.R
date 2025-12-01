@@ -50,7 +50,6 @@ loo_pred_measure <- function(
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
 
-  # TODO: check warning msgs
   # check appropriate arguments for measure
   if (
     measure %in%
@@ -113,9 +112,15 @@ loo_pred_measure <- function(
 
   measure_values <- do.call(pred_fun, args)
 
+  # TODO: should we putting pointwise values back into loo object?
+  if (!is.null(loo)) {
+    loo$pointwise[, .match_pointwise_column(
+      measure
+    )] <- measure_values$pointwise
+  }
   # TODO: add diagnostics? need loo object for that though
 
-  # TODO: return new object
+  # TODO: return new object?
   structure(
     c(
       measure_values,

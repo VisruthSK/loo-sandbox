@@ -9,11 +9,7 @@ mse <- function(y, mupred, log_weights) {
   checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .mse_summary(
     y = y,
@@ -34,11 +30,7 @@ rmse <- function(y, mupred, log_weights) {
   checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .rmse_summary(
     y = y,
@@ -59,11 +51,7 @@ mae <- function(y, mupred, log_weights) {
   checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .mae_summary(y = y, mupred = mupred, log_weights = log_weights)
 }
@@ -79,11 +67,7 @@ r2 <- function(y, mupred, log_weights) {
   checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .r2_summary(
     y = y,
@@ -104,11 +88,7 @@ acc <- function(y, mupred, log_weights) {
   checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .accuracy_summary(
     y = y,
@@ -129,11 +109,7 @@ balanced_acc <- function(y, mupred, log_weights) {
   checkmate::assert_matrix(mupred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .balanced_accuracy_summary(
     y = y,
@@ -154,11 +130,7 @@ elpd <- function(ylp, log_weights) {
   checkmate::assert_matrix(ylp, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .elpd_summary(ylp = ylp, log_weights = log_weights, pointwise = NULL)
 }
@@ -174,11 +146,7 @@ logscore <- function(ylp, log_weights) {
   checkmate::assert_matrix(ylp, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .logscore_summary(ylp = ylp, log_weights = log_weights, pointwise = NULL)
 }
@@ -258,11 +226,7 @@ rps <- function(y, ypred, log_weights) {
   checkmate::assert_matrix(ypred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .rps_summary(
     y = y,
@@ -291,11 +255,7 @@ srps <- function(y, ypred, log_weights) {
   checkmate::assert_matrix(ypred, ncols = n)
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 
-  log_weights <- sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights)
-  )
+  log_weights <- .standardize_log_weights(log_weights)
 
   .srps_summary(
     y = y,
