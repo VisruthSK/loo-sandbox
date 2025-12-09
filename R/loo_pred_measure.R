@@ -17,14 +17,12 @@ loo_pred_measure <- function(
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
-  loo, # This `loo` object needs to be fit with `save_psis = TRUE`
   measure = c(
     "logscore",
     "elpd", # TODO: note that this is stored in `loo` object already
     "r2",
     "rps",
     "crps",
-    # TODO: is srps option needed; ask Aki
     "srps",
     "scrps",
     "mae",
@@ -34,9 +32,10 @@ loo_pred_measure <- function(
     # "energy",
     "balanced_acc"
   ),
-  group_ids = NULL
-  # ,psis_object = NULL,
-  # save_psis = FALSE
+  group_ids = NULL,
+  loo = NULL, # This `loo` object needs to be fit with `save_psis = TRUE`
+  psis_object = NULL
+  #,save_psis = TRUE # always save PSIS object and log_weights to save 1 computation?
 ) {
   n <- length(y)
   # TODO: refactor this--ypred etc could be functions; ask Aki. Could maybe use S7 multiple dispatch?
@@ -88,57 +87,66 @@ loo_pred_measure <- function(
     args <- list(ylp = ylp)
   }
 
-  # TODO: get logweights from `psis` obj or making them
   # Aki said: The arguments are the same except instead of predperf object, loo or psis object can be given. If neither of these is given, but ylp is given then that works as log_lik and psis object is created internally. save_psis would control whether the psis_object is also stored in the returned object.
 
-  psis <- loo$psis_object
-  if (is.null(psis) || !is.psis(psis)) {
-    stop(
-      "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
+  # get log weights from provided psis_object, or create it
+  psis_loo <- loo$psis_object
+  if (!missing(psis_object) && !is.null(psis_loo)) {
+    # TODO: is this correct?
+    # both psis and loo; default to loo
+    warning(
+      "Passing both PSIS and loo objects is not advised--defaulting to getting log-weights from loo object."
     )
+    psis_used <- psis_loo
+  } else if (missing(psis_object) || is.null(psis_loo)) {
+    if (missing(psis_object)) {
+      # no psis_object, but there is loo object
+      if (is.null(psis_loo) || !is.psis(psis_loo)) {
+        stop(
+          "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
+        )
+      } else {
+        psis_used <- psis_loo
+      }
+    } else {
+      # no loo object, but there is psis_object
+      psis_used <- psis_object
+    }
   } else {
-    log_weights <- weights(psis)
-    checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
-    args$log_weights <- .standardize_log_weights(log_weights)
+    # neither psis_object nor loo are passed
+    if (is.null(ylp) || !is.psis(ylp)) {
+      stop(
+        "No possible way to obtain log-weights. Pass psis object, loo object with the argument `save_psis = TRUE`, or ylp."
+      )
+    }
+    psis_used <- psis(ylp)
   }
 
-  # TODO: CHECK EVERYTHING WITH AKI; ask Aki
-
-  if (!is.null(loo)) {
-    args$pointwise <- tryCatch(
-      loo$pointwise[, .match_pointwise_column(measure)],
-      error = function(e) NULL
-    )
-  }
+  log_weights <- weights(psis_used)
+  checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
+  args$log_weights <- .standardize_log_weights(log_weights)
 
   measure_values <- do.call(pred_fun, args)
+  # TODO: PRINT DIAGNOSTICS
 
-  # TODO: should we be putting pointwise values back into loo object?
-  if (
-    !is.null(loo) &&
-      !is.null(pointwise_col) &&
-      !(pointwise_col %in% colnames(loo$pointwise))
-  ) {
-    new_col <- matrix(measure_values$pointwise, ncol = 1)
-    colnames(new_col) <- pointwise_col
-    loo$pointwise <- cbind(loo$pointwise, new_col)
-  }
-  # TODO: add diagnostics? need loo object for that though
-
-  # TODO: return new object?
+  # TODO: finalize structure of new object
   structure(
-    c(
-      measure_values,
-      loo = loo
+    list(
+      unlist(measure_values), # TODO: transform into estimates/pointwise dfs
+      y = y,
+      ypred = ypred,
+      mupred = mupred,
+      ylp = ylp,
+      group_ids = group_ids,
+      log_weights = log_weights,
+      psis_object = psis_final
     ),
     class = c("loo_pred_measure", "pred_measure")
   )
-  measure_values
+  measure_values # TODO: remove; holdover for tests
 }
 
 # ----------------------------- Measures -----------------------------
-
-# TODO: SEs are for LOO estimates--how to work for insample results?
 
 #' Identify measure function function by `measure`
 #'
@@ -160,7 +168,6 @@ loo_pred_measure <- function(
     "balanced_acc" = .balanced_accuracy_summary,
     "rps" = .rps_summary,
     "crps" = .rps_summary,
-    # TODO: is srps option needed
     "srps" = .srps_summary,
     "scrps" = .srps_summary,
     # , "energy" = .energy
@@ -178,7 +185,7 @@ loo_pred_measure <- function(
     "elpd" = .pointwise_elpd,
     "logscore" = .pointwise_elpd,
     "mlpd" = .pointwise_elpd,
-    "mae" = .pointwise_absolute_error,
+    "mae" = .pointwise_squared_error,
     "r2" = .pointwise_squared_error,
     "rmse" = .pointwise_squared_error,
     "mse" = .pointwise_squared_error,
@@ -202,7 +209,7 @@ loo_pred_measure <- function(
     "elpd" = "elpd_loo",
     "logscore" = "elpd_loo",
     "mlpd" = "elpd_loo",
-    "mae" = "absolute_error_loo",
+    "mae" = "squared_error_loo",
     "r2" = "squared_error_loo",
     "rmse" = "squared_error_loo",
     "mse" = "squared_error_loo",
@@ -214,6 +221,8 @@ loo_pred_measure <- function(
     "scrps" = "scrps_loo"
   )
 }
+
+# TODO: make sure that summary/measures documentation are `loo`-agnostic; they work for k-fold, etc. too so no loo specific language?
 
 #' Shared parameters for pointwise functions
 #'
@@ -249,15 +258,6 @@ NULL
 
 # ----------------------------- Metrics -----------------------------
 
-#' Pointwise absolute error
-#'
-#' @noRd
-#' @inheritParams pointwise_measure_params
-#' @inheritSection pointwise_measure_params Assumptions
-.pointwise_absolute_error <- function(y, mupred, log_weights) {
-  abs(y - .loo_weighted_mean(mupred, log_weights))
-}
-
 #' Pointwise squared error
 #'
 #' @noRd
@@ -272,20 +272,25 @@ NULL
 #' @noRd
 #' @inheritParams summary_measure_params
 #' @inheritSection summary_measure_params Assumptions
-.mae_summary <- function(y, mupred, log_weights) {
-  .simple_pointwise_summary(
+.mae_summary <- function(y, mupred, log_weights, pointwise = NULL) {
+  pointwise <- if (is.null(pointwise)) {
     vapply(
       seq_len(length(y)),
       function(i) {
-        .pointwise_absolute_error(
-          y[i],
-          mupred[, i],
-          log_weights[, i]
+        sqrt(
+          .pointwise_squared_error(
+            y[i],
+            mupred[, i],
+            log_weights[, i]
+          )
         )
       },
       numeric(1)
     )
-  )
+  } else {
+    pointwise
+  }
+  .simple_pointwise_summary(pointwise)
 }
 
 #' Mean squared error

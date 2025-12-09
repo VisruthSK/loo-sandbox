@@ -53,7 +53,12 @@ mae <- function(y, mupred, log_weights) {
 
   log_weights <- .standardize_log_weights(log_weights)
 
-  .mae_summary(y = y, mupred = mupred, log_weights = log_weights)
+  .mae_summary(
+    y = y,
+    mupred = mupred,
+    log_weights = log_weights,
+    pointwise = NULL
+  )
 }
 
 #' R^2
