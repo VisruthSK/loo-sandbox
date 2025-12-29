@@ -171,6 +171,7 @@ loo_pred_measure <- function(
   diagnostics <- if (!is.null(loo) && !is.null(loo$diagnostics)) {
     loo$diagnostics
   } else if (!is.null(psis_used$diagnostics)) {
+    # TODO: handle this more gracefully
     psis_used$diagnostics
   } else {
     # TODO: construct diagnostics?
