@@ -9,10 +9,11 @@ loo_pred_measure(
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
-  loo,
   measure = c("logscore", "elpd", "r2", "rps", "crps", "srps", "scrps", "mae", "rmse",
     "mse", "acc", "balanced_acc"),
-  group_ids = NULL
+  group_ids = NULL,
+  loo = NULL,
+  psis_object = NULL
 )
 }
 \arguments{
@@ -24,11 +25,11 @@ loo_pred_measure(
 
 \item{ylp}{Placeholder}
 
-\item{loo}{Placeholder}
-
 \item{measure}{Placeholder}
 
 \item{group_ids}{Placeholder}
+
+\item{loo}{Placeholder}
 }
 \value{
 Placeholder

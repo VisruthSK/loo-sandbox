@@ -74,7 +74,23 @@ run_wrapper_test <- function(
         stop("Unknown wrapper: ", wrapper_name)
       )
 
-      expect_equal(result, expected, info = model_name)
+      results_col <- loosandbox:::.match_results_column(measure)
+      pointwise_col <- loosandbox:::.match_pointwise_column(measure)
+      expect_equal(
+        result$estimate,
+        expected$estimates[results_col, "Estimate"],
+        info = model_name
+      )
+      expect_equal(
+        result$se,
+        expected$estimates[results_col, "SE"],
+        info = model_name
+      )
+      expect_equal(
+        result$pointwise,
+        expected$pointwise[, pointwise_col],
+        info = model_name
+      )
     }
   })
 }

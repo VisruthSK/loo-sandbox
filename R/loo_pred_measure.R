@@ -49,6 +49,7 @@ loo_pred_measure <- function(
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
   pointwise_col <- .match_pointwise_column(measure)
+  results_col <- .match_results_column(measure)
 
   # check appropriate arguments for measure
   if (
@@ -62,6 +63,7 @@ loo_pred_measure <- function(
         "balanced_acc"
       )
   ) {
+    # TODO: better error messages here
     checkmate::assert_matrix(mupred, nrows = S, ncols = n)
     args <- list(y = y, mupred = mupred)
   } else if (
@@ -89,32 +91,30 @@ loo_pred_measure <- function(
 
   # Aki said: The arguments are the same except instead of predperf object, loo or psis object can be given. If neither of these is given, but ylp is given then that works as log_lik and psis object is created internally. save_psis would control whether the psis_object is also stored in the returned object.
 
-  # get log weights from provided psis_object, or create it
-  psis_loo <- loo$psis_object
-  if (!missing(psis_object) && !is.null(psis_loo)) {
-    # TODO: is this correct?
-    # both psis and loo; default to loo
+  # get log weights from provided psis_object, loo object, or create from log lik
+  psis_loo <- if (!is.null(loo)) loo$psis_object else NULL
+  has_psis_arg <- !missing(psis_object) && !is.null(psis_object)
+  has_loo_psis <- !is.null(psis_loo)
+
+  if (has_psis_arg && has_loo_psis) {
     warning(
       "Passing both PSIS and loo objects is not advised--defaulting to getting log-weights from loo object."
     )
     psis_used <- psis_loo
-  } else if (missing(psis_object) || is.null(psis_loo)) {
-    if (missing(psis_object)) {
-      # no psis_object, but there is loo object
-      if (is.null(psis_loo) || !is.psis(psis_loo)) {
-        stop(
-          "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
-        )
-      } else {
-        psis_used <- psis_loo
-      }
-    } else {
-      # no loo object, but there is psis_object
-      psis_used <- psis_object
+  } else if (has_psis_arg) {
+    if (!is.psis(psis_object)) {
+      stop("Provided `psis_object` is not a valid `psis` object.")
     }
+    psis_used <- psis_object
+  } else if (has_loo_psis) {
+    if (!is.psis(psis_loo)) {
+      stop(
+        "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
+      )
+    }
+    psis_used <- psis_loo
   } else {
-    # neither psis_object nor loo are passed
-    if (is.null(ylp) || !is.psis(ylp)) {
+    if (is.null(ylp)) {
       stop(
         "No possible way to obtain log-weights. Pass psis object, loo object with the argument `save_psis = TRUE`, or ylp."
       )
@@ -126,24 +126,106 @@ loo_pred_measure <- function(
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
   args$log_weights <- .standardize_log_weights(log_weights)
 
-  measure_values <- do.call(pred_fun, args)
-  # TODO: PRINT DIAGNOSTICS
+  if (!is.null(loo) && !is.null(loo$pointwise)) {
+    if (pointwise_col %in% colnames(loo$pointwise)) {
+      args$pointwise <- loo$pointwise[, pointwise_col]
+    }
+  }
 
-  # TODO: finalize structure of new object
+  measure_values <- do.call(pred_fun, args)
+
+  if (!is.null(loo) && !is.null(loo$estimates)) {
+    estimates <- loo$estimates
+    new_row <- matrix(
+      c(measure_values$estimate, measure_values$se),
+      nrow = 1,
+      dimnames = list(results_col, colnames(estimates))
+    )
+    estimates <- rbind(estimates, new_row)
+  } else {
+    estimates <- matrix(
+      c(measure_values$estimate, measure_values$se),
+      nrow = 1,
+      dimnames = list(results_col, c("Estimate", "SE"))
+    )
+  }
+  if (!is.null(loo) && !is.null(loo$pointwise)) {
+    pointwise <- loo$pointwise
+    if (!(pointwise_col %in% colnames(pointwise))) {
+      pointwise <- cbind(
+        pointwise,
+        matrix(
+          measure_values$pointwise,
+          ncol = 1,
+          dimnames = list(NULL, pointwise_col)
+        )
+      )
+    }
+  } else {
+    pointwise <- matrix(
+      measure_values$pointwise,
+      ncol = 1,
+      dimnames = list(NULL, pointwise_col)
+    )
+  }
+  diagnostics <- if (!is.null(loo) && !is.null(loo$diagnostics)) {
+    loo$diagnostics
+  } else if (!is.null(psis_used$diagnostics)) {
+    psis_used$diagnostics
+  } else {
+    # TODO: construct diagnostics?
+    list()
+  }
+
   structure(
     list(
-      unlist(measure_values), # TODO: transform into estimates/pointwise dfs
+      estimates = estimates,
+      pointwise = pointwise,
+      diagnostics = diagnostics,
       y = y,
       ypred = ypred,
       mupred = mupred,
       ylp = ylp,
       group_ids = group_ids,
       log_weights = log_weights,
-      psis_object = psis_final
+      psis_object = psis_used
     ),
-    class = c("loo_pred_measure", "pred_measure")
+    class = c(
+      "loo_pred_measure",
+      "pred_measure",
+      "psis_loo",
+      "importance_sampling_loo",
+      "loo"
+    ),
+    dims = dim(log_weights)
   )
-  measure_values # TODO: remove; holdover for tests
+}
+
+#' @export
+print.loo_pred_measure <- function(x, digits = 1, ...) {
+  has_diag <- !is.null(x$diagnostics) && !is.null(x$diagnostics$pareto_k)
+  has_mcse <- !is.null(x$pointwise) &&
+    "mcse_elpd_loo" %in% colnames(x$pointwise)
+  if (has_diag && has_mcse) {
+    loo:::print.psis_loo(x, digits = digits, ...)
+  } else {
+    loo:::print.loo(x, digits = digits, ...)
+  }
+}
+
+#' @export
+print_dims.loo_pred_measure <- function(x, ...) {
+  dims <- attr(x, "dims", exact = TRUE)
+  if (is.null(dims)) {
+    dims <- dim(x$log_weights)
+  }
+  if (!is.null(dims)) {
+    cat(
+      "Computed from",
+      paste(dims, collapse = " by "),
+      "log-likelihood matrix.\n"
+    )
+  }
 }
 
 # ----------------------------- Measures -----------------------------
@@ -219,6 +301,30 @@ loo_pred_measure <- function(
     "crps" = "rps_loo",
     "srps" = "srps_loo",
     "scrps" = "scrps_loo"
+  )
+}
+
+#' Match measure to results column name
+#'
+#' @noRd
+#' @param measure The measure used.
+#' @return The column name in the loo results matrix for the given measure.
+.match_results_column <- function(measure) {
+  switch(
+    measure,
+    "elpd" = "elpd_loo",
+    "logscore" = "logscore_loo",
+    "mlpd" = "mlpd_loo",
+    "mae" = "mae",
+    "r2" = "r2",
+    "rmse" = "rmse",
+    "mse" = "mse",
+    "acc" = "acc",
+    "balanced_acc" = "bal_acc",
+    "rps" = "rps",
+    "crps" = "rps",
+    "srps" = "srps",
+    "scrps" = "srps"
   )
 }
 
