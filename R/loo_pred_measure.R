@@ -319,13 +319,11 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
   )
 }
 
-# TODO: make sure that summary/measures documentation are `loo`-agnostic; they work for k-fold, etc. too so no loo specific language?
-
 #' Shared parameters for pointwise functions
 #'
 #' @param y scalar, leave one out value
 #' @param ypred vector (S) of posterior predictive draws
-#' @param ylp vector (S) of pointwise LOO log predictive densities
+#' @param ylp vector (S) of pointwise log predictive densities
 #' @param mupred vector (S) of point predictions
 #' @param log_weights vector of standardized loo weights (S) on the log scale
 #'
@@ -340,7 +338,7 @@ NULL
 #'
 #' @param y vector of observed values (n)
 #' @param ypred matrix of posterior draws (S x n) of posterior predictive draws
-#' @param ylp matrix of posterior draws (S x n) of pointwise LOO log predictive densities
+#' @param ylp matrix of posterior draws (S x n) of pointwise log predictive densities
 #' @param mupred matrix of posterior draws (S x n) of point predictions
 #' @param log_weights matrix of standardized loo weights (S x n) on the log scale
 #'
