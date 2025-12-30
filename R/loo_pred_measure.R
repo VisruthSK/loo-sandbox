@@ -282,7 +282,7 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
     "elpd" = "elpd_loo",
     "logscore" = "elpd_loo",
     "mlpd" = "elpd_loo",
-    "mae" = "mae_loo",
+    "mae" = "squared_error_loo",
     "r2" = "squared_error_loo",
     "rmse" = "squared_error_loo",
     "mse" = "squared_error_loo",
@@ -374,12 +374,10 @@ NULL
     vapply(
       seq_len(length(y)),
       function(i) {
-        sqrt(
-          .pointwise_squared_error(
-            y[i],
-            mupred[, i],
-            log_weights[, i]
-          )
+        .pointwise_squared_error(
+          y[i],
+          mupred[, i],
+          log_weights[, i]
         )
       },
       numeric(1)
@@ -387,7 +385,8 @@ NULL
   } else {
     pointwise
   }
-  .simple_pointwise_summary(pointwise)
+  .simple_pointwise_summary(sqrt(pointwise)) |>
+    modifyList(list(pointwise = pointwise)) # store squared error
 }
 
 #' Mean squared error
