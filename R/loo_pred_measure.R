@@ -97,8 +97,8 @@ loo_pred_measure <- function(
   # Aki said: The arguments are the same except instead of predperf object, loo or psis object can be given. If neither of these is given, but ylp is given then that works as log_lik and psis object is created internally. save_psis would control whether the psis_object is also stored in the returned object.
 
   # get log weights from provided psis_object, loo object, or create from log lik
-  log_weights <- NULL
-  psis_loo <- if (!is.null(loo)) loo$psis_object else NULL
+  log_weights <- loo$log_weights
+  psis_loo <- loo$psis_object
   has_psis_arg <- !missing(psis_object) && !is.null(psis_object)
   has_loo_psis <- !is.null(psis_loo)
 
@@ -107,11 +107,6 @@ loo_pred_measure <- function(
       "Passing both PSIS and loo objects is not advised--defaulting to getting log-weights from loo object."
     )
     psis_used <- psis_loo
-  } else if (has_psis_arg) {
-    if (!is.psis(psis_object)) {
-      stop("Provided `psis_object` is not a valid `psis` object.")
-    }
-    psis_used <- psis_object
   } else if (has_loo_psis) {
     if (!is.psis(psis_loo)) {
       stop(
@@ -119,9 +114,12 @@ loo_pred_measure <- function(
       )
     }
     psis_used <- psis_loo
-  } else if (!is.null(loo$log_weights)) {
-    log_weights <- loo$log_weights
-  } else {
+  } else if (has_psis_arg) {
+    if (!is.psis(psis_object)) {
+      stop("Provided `psis_object` is not a valid `psis` object.")
+    }
+    psis_used <- psis_object
+  } else if (is.null(log_weights)) {
     if (is.null(ylp)) {
       stop(
         "No possible way to obtain log-weights. Pass psis object, loo object with the argument `save_psis = TRUE`, or ylp."
@@ -186,7 +184,7 @@ loo_pred_measure <- function(
   }
   diagnostics <- if (!is.null(loo) && !is.null(loo$diagnostics)) {
     loo$diagnostics
-  } else if (!is.null(psis_used$diagnostics)) {
+  } else if (!is.null(psis_used)) {
     # TODO: double check this? This is used when ylp or psis_object are passed
     psis_used$diagnostics
   }
@@ -284,16 +282,16 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
     "elpd" = "elpd_loo",
     "logscore" = "elpd_loo",
     "mlpd" = "elpd_loo",
-    "mae" = "squared_error_loo",
+    "mae" = "mae_loo",
     "r2" = "squared_error_loo",
     "rmse" = "squared_error_loo",
     "mse" = "squared_error_loo",
     "acc" = "accuracy_loo",
     "balanced_acc" = "accuracy_loo",
     "rps" = "rps_loo",
-    "crps" = "rps_loo",
+    "crps" = "crps_loo",
     "srps" = "srps_loo",
-    "scrps" = "srps_loo"
+    "scrps" = "scrps_loo"
   )
 }
 
@@ -315,9 +313,9 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
     "acc" = "acc",
     "balanced_acc" = "bal_acc",
     "rps" = "rps",
-    "crps" = "rps",
+    "crps" = "crps",
     "srps" = "srps",
-    "scrps" = "srps"
+    "scrps" = "scrps"
   )
 }
 

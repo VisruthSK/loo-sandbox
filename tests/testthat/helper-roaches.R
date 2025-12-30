@@ -5,7 +5,7 @@ roaches_models <- local({
     loo_obj <- readRDS(testthat::test_path("fits", sprintf("loo%d.RDS", id)))
     y <- as.numeric(rstanarm::get_y(fit))
     mupred <- rstanarm::posterior_epred(fit)
-    ypred <- rstanarm::posterior_predict(fit)
+    ypred <- with(set.seed(0), rstanarm::posterior_predict(fit))
     S <- nrow(mupred)
     list(
       y = y,
