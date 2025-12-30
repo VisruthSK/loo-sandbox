@@ -75,7 +75,7 @@ run_wrapper_test <- function(
       )
 
       results_col <- loosandbox:::.match_results_column(measure)
-      pointwise_col <- loosandbox:::.match_pointwise_column(measure)
+      pointwise_col <- loosandbox:::.match_loo_pointwise_column(measure)
       expect_equal(
         result$estimate,
         expected$estimates[results_col, "Estimate"],
