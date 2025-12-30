@@ -13,7 +13,8 @@ loo_pred_measure(
     "mse", "acc", "balanced_acc"),
   group_ids = NULL,
   loo = NULL,
-  psis_object = NULL
+  psis_object = NULL,
+  save_psis = FALSE
 )
 }
 \arguments{
@@ -30,6 +31,10 @@ loo_pred_measure(
 \item{group_ids}{Placeholder}
 
 \item{loo}{Placeholder}
+
+\item{psis_object}{Placeholder}
+
+\item{save_psis}{Placeholder}
 }
 \value{
 Placeholder

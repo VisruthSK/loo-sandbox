@@ -8,6 +8,8 @@
 #' @param loo Placeholder
 #' @param measure Placeholder
 #' @param group_ids Placeholder
+#' @param psis_object Placeholder
+#' @param save_psis Placeholder
 #'
 #' @return Placeholder
 #'
@@ -95,6 +97,7 @@ loo_pred_measure <- function(
   # Aki said: The arguments are the same except instead of predperf object, loo or psis object can be given. If neither of these is given, but ylp is given then that works as log_lik and psis object is created internally. save_psis would control whether the psis_object is also stored in the returned object.
 
   # get log weights from provided psis_object, loo object, or create from log lik
+  log_weights <- NULL
   psis_loo <- if (!is.null(loo)) loo$psis_object else NULL
   has_psis_arg <- !missing(psis_object) && !is.null(psis_object)
   has_loo_psis <- !is.null(psis_loo)
@@ -116,6 +119,8 @@ loo_pred_measure <- function(
       )
     }
     psis_used <- psis_loo
+  } else if (!is.null(loo$log_weights)) {
+    log_weights <- loo$log_weights
   } else {
     if (is.null(ylp)) {
       stop(
@@ -125,7 +130,9 @@ loo_pred_measure <- function(
     psis_used <- psis(ylp)
   }
 
-  log_weights <- weights(psis_used)
+  if (is.null(log_weights)) {
+    log_weights <- weights(psis_used)
+  }
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
   args$log_weights <- .standardize_log_weights(log_weights)
 
@@ -199,7 +206,7 @@ loo_pred_measure <- function(
       "importance_sampling_loo",
       "loo"
     ),
-    dims = dim(psis_used)
+    dims = dim(log_weights)
   )
 }
 
