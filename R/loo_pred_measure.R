@@ -37,14 +37,16 @@ loo_pred_measure <- function(
   psis_object = NULL
   #,save_psis = TRUE # always save PSIS object and log_weights to save 1 computation?
 ) {
-  n <- length(y)
   # TODO: refactor this--ypred etc could be functions; ask Aki. Could maybe use S7 multiple dispatch?
-  S <- if (!is.null(ypred)) {
-    nrow(ypred)
+  if (!is.null(ypred)) {
+    S <- nrow(ypred)
+    n <- ncol(ypred)
   } else if (!is.null(ylp)) {
-    nrow(ylp)
+    S <- nrow(ylp)
+    n <- ncol(ylp)
   } else if (!is.null(mupred)) {
-    nrow(mupred)
+    S <- nrow(mupred)
+    n <- ncol(mupred)
   }
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
@@ -211,21 +213,6 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
     loo:::print.psis_loo(x, digits = digits, ...)
   } else {
     loo:::print.loo(x, digits = digits, ...)
-  }
-}
-
-#' @export
-print_dims.loo_pred_measure <- function(x, ...) {
-  dims <- attr(x, "dims", exact = TRUE)
-  if (is.null(dims)) {
-    dims <- dim(x$log_weights)
-  }
-  if (!is.null(dims)) {
-    cat(
-      "Computed from",
-      paste(dims, collapse = " by "),
-      "log-likelihood matrix.\n"
-    )
   }
 }
 
