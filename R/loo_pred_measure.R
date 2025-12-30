@@ -34,8 +34,8 @@ loo_pred_measure <- function(
   ),
   group_ids = NULL,
   loo = NULL, # This `loo` object needs to be fit with `save_psis = TRUE`
-  psis_object = NULL
-  #,save_psis = TRUE # always save PSIS object and log_weights to save 1 computation?
+  psis_object = NULL,
+  save_psis = FALSE
 ) {
   # TODO: refactor this--ypred etc could be functions; ask Aki. Could maybe use S7 multiple dispatch?
   if (!is.null(ypred)) {
@@ -50,9 +50,10 @@ loo_pred_measure <- function(
   }
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
-  pointwise_col <- .match_pointwise_column(measure)
+  pointwise_col <- .match_loo_pointwise_column(measure)
   results_col <- .match_results_column(measure)
 
+  # TODO: move things to common functions so they can be reused in pred_measure()
   # check appropriate arguments for measure
   if (
     measure %in%
@@ -145,6 +146,11 @@ loo_pred_measure <- function(
     )
     estimates <- rbind(estimates, new_row)
   } else {
+    # $ estimates  : num [1:4, 1:2] -6.25e+03 2.92e+02 1.25e+04 7.02e-02 7.28e+02 ...
+    # ..- attr(*, "dimnames")=List of 2
+    # .. ..$ : chr [1:4] "elpd_loo" "p_loo" "looic" "r2"
+    # .. ..$ : chr [1:2] "Estimate" "SE"
+    # TODO: by default calculate elpd_loo and p_loo, then append measure estimates so it looks like normal loo output
     estimates <- matrix(
       c(measure_values$estimate, measure_values$se),
       nrow = 1,
@@ -152,6 +158,7 @@ loo_pred_measure <- function(
     )
   }
   if (!is.null(loo) && !is.null(loo$pointwise)) {
+    # TODO: by default calculate elpd_loo then append measure pointwise
     pointwise <- loo$pointwise
     if (!(pointwise_col %in% colnames(pointwise))) {
       pointwise <- cbind(
@@ -173,11 +180,8 @@ loo_pred_measure <- function(
   diagnostics <- if (!is.null(loo) && !is.null(loo$diagnostics)) {
     loo$diagnostics
   } else if (!is.null(psis_used$diagnostics)) {
-    # TODO: handle this more gracefully
+    # TODO: double check this? This is used when ylp or psis_object are passed
     psis_used$diagnostics
-  } else {
-    # TODO: construct diagnostics?
-    list()
   }
 
   structure(
@@ -185,13 +189,8 @@ loo_pred_measure <- function(
       estimates = estimates,
       pointwise = pointwise,
       diagnostics = diagnostics,
-      y = y,
-      ypred = ypred,
-      mupred = mupred,
-      ylp = ylp,
-      group_ids = group_ids,
       log_weights = log_weights,
-      psis_object = psis_used
+      psis_object = if (save_psis) psis_used else NULL
     ),
     class = c(
       "loo_pred_measure",
@@ -200,21 +199,19 @@ loo_pred_measure <- function(
       "importance_sampling_loo",
       "loo"
     ),
-    dims = dim(log_weights)
+    dims = dim(psis_used)
   )
 }
 
 #' @export
 print.loo_pred_measure <- function(x, digits = 1, ...) {
-  has_diag <- !is.null(x$diagnostics) && !is.null(x$diagnostics$pareto_k)
-  has_mcse <- !is.null(x$pointwise) &&
-    "mcse_elpd_loo" %in% colnames(x$pointwise)
-  if (has_diag && has_mcse) {
-    loo:::print.psis_loo(x, digits = digits, ...)
-  } else {
-    loo:::print.loo(x, digits = digits, ...)
-  }
+  # TODO: maybe copy implementation over
+  loo:::print.psis_loo(x, digits = digits, ...)
 }
+
+# TODO: pred measure print should have a tag for where the data is from
+# insample won't be able to estimate effective # of params, but k-fold and test can. That should be handled in print
+# k-fold should store the splits
 
 # ----------------------------- Measures -----------------------------
 
@@ -273,7 +270,8 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
 #' @noRd
 #' @param measure The measure used.
 #' @return The column name in the loo pointwise matrix for the given measure.
-.match_pointwise_column <- function(measure) {
+.match_loo_pointwise_column <- function(measure) {
+  # TODO: maybe remove _loo but would be breaking change
   switch(
     measure,
     "elpd" = "elpd_loo",
@@ -288,7 +286,7 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
     "rps" = "rps_loo",
     "crps" = "rps_loo",
     "srps" = "srps_loo",
-    "scrps" = "scrps_loo"
+    "scrps" = "srps_loo"
   )
 }
 
@@ -300,9 +298,9 @@ print.loo_pred_measure <- function(x, digits = 1, ...) {
 .match_results_column <- function(measure) {
   switch(
     measure,
-    "elpd" = "elpd_loo",
-    "logscore" = "logscore_loo",
-    "mlpd" = "mlpd_loo",
+    "elpd" = "elpd_loo", # _loo is for backward compat
+    "logscore" = "logscore",
+    "mlpd" = "mpld",
     "mae" = "mae",
     "r2" = "r2",
     "rmse" = "rmse",
