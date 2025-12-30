@@ -14,7 +14,8 @@ loo_pred_measure(
     "mse", "acc", "balanced_acc"),
   group_ids = NULL,
   loo = NULL,
-  psis_object = NULL
+  psis_object = NULL,
+  save_psis = FALSE
 )
 ```
 
@@ -45,6 +46,14 @@ loo_pred_measure(
   Placeholder
 
 - loo:
+
+  Placeholder
+
+- psis_object:
+
+  Placeholder
+
+- save_psis:
 
   Placeholder
 
