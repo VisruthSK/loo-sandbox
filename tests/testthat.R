@@ -8,5 +8,6 @@
 
 library(testthat)
 library(loosandbox)
+library(loo)
 
 test_check("loosandbox")

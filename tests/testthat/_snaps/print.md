@@ -258,21 +258,20 @@
     
     Computed from 4000 by 262 log-likelihood matrix.
     
-                Estimate       SE
-    elpd_loo     -6247.5    727.9
-    p_loo          292.1     73.3
-    looic        12495.0   1455.7
-    r2               0.1      0.2
-    rmse            48.9      6.6
-    mse           2394.6    644.1
-    mae             26.9      2.5
-    acc              0.6      0.0
-    bal_acc          0.5      0.0
-    rps        1253804.8 225541.2
-    crps       1253804.8 225541.2
-    srps             NaN      NaN
-    scrps            NaN      NaN
-    elpd_loo.1   -6247.5    727.9
+              Estimate       SE
+    elpd_loo   -6247.5    727.9
+    p_loo        292.1     73.3
+    looic      12495.0   1455.7
+    r2             0.1      0.2
+    rmse          48.9      6.6
+    mse         2394.6    644.1
+    mae           26.9      2.5
+    acc            0.6      0.0
+    bal_acc        0.5      0.0
+    rps      1253804.8 225541.2
+    crps     1253804.8 225541.2
+    srps           NaN      NaN
+    scrps          NaN      NaN
     ------
     MCSE of elpd_loo is NA.
     MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.2]).
@@ -289,22 +288,21 @@
     
     Computed from 4000 by 262 log-likelihood matrix.
     
-                Estimate       SE
-    elpd_loo     -6247.5    727.9
-    p_loo          292.1     73.3
-    looic        12495.0   1455.7
-    r2               0.1      0.2
-    rmse            48.9      6.6
-    mse           2394.6    644.1
-    mae             26.9      2.5
-    acc              0.6      0.0
-    bal_acc          0.5      0.0
-    rps        1253804.8 225541.2
-    crps       1253804.8 225541.2
-    srps             NaN      NaN
-    scrps            NaN      NaN
-    elpd_loo.1   -6247.5    727.9
-    logscore       -23.8      2.8
+              Estimate       SE
+    elpd_loo   -6247.5    727.9
+    p_loo        292.1     73.3
+    looic      12495.0   1455.7
+    r2             0.1      0.2
+    rmse          48.9      6.6
+    mse         2394.6    644.1
+    mae           26.9      2.5
+    acc            0.6      0.0
+    bal_acc        0.5      0.0
+    rps      1253804.8 225541.2
+    crps     1253804.8 225541.2
+    srps           NaN      NaN
+    scrps          NaN      NaN
+    logscore     -23.8      2.8
     ------
     MCSE of elpd_loo is NA.
     MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.2]).
@@ -546,20 +544,19 @@
     
     Computed from 4000 by 262 log-likelihood matrix.
     
-                Estimate       SE
-    elpd_loo     -6247.5    727.9
-    p_loo          292.1     73.3
-    looic        12495.0   1455.7
-    srps             NaN      NaN
-    mae             26.9      2.5
-    rps        1253804.8 225541.2
-    r2               0.1      0.2
-    rmse            48.9      6.6
-    acc              0.6      0.0
-    mse           2394.6    644.1
-    crps       1253804.8 225541.2
-    bal_acc          0.5      0.0
-    elpd_loo.1   -6247.5    727.9
+              Estimate       SE
+    elpd_loo   -6247.5    727.9
+    p_loo        292.1     73.3
+    looic      12495.0   1455.7
+    srps           NaN      NaN
+    mae           26.9      2.5
+    rps      1253804.8 225541.2
+    r2             0.1      0.2
+    rmse          48.9      6.6
+    acc            0.6      0.0
+    mse         2394.6    644.1
+    crps     1253804.8 225541.2
+    bal_acc        0.5      0.0
     ------
     MCSE of elpd_loo is NA.
     MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.2]).
@@ -576,21 +573,20 @@
     
     Computed from 4000 by 262 log-likelihood matrix.
     
-                Estimate       SE
-    elpd_loo     -6247.5    727.9
-    p_loo          292.1     73.3
-    looic        12495.0   1455.7
-    srps             NaN      NaN
-    mae             26.9      2.5
-    rps        1253804.8 225541.2
-    r2               0.1      0.2
-    rmse            48.9      6.6
-    acc              0.6      0.0
-    mse           2394.6    644.1
-    crps       1253804.8 225541.2
-    bal_acc          0.5      0.0
-    elpd_loo.1   -6247.5    727.9
-    logscore       -23.8      2.8
+              Estimate       SE
+    elpd_loo   -6247.5    727.9
+    p_loo        292.1     73.3
+    looic      12495.0   1455.7
+    srps           NaN      NaN
+    mae           26.9      2.5
+    rps      1253804.8 225541.2
+    r2             0.1      0.2
+    rmse          48.9      6.6
+    acc            0.6      0.0
+    mse         2394.6    644.1
+    crps     1253804.8 225541.2
+    bal_acc        0.5      0.0
+    logscore     -23.8      2.8
     ------
     MCSE of elpd_loo is NA.
     MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.2]).
@@ -607,22 +603,21 @@
     
     Computed from 4000 by 262 log-likelihood matrix.
     
-                Estimate       SE
-    elpd_loo     -6247.5    727.9
-    p_loo          292.1     73.3
-    looic        12495.0   1455.7
-    srps             NaN      NaN
-    mae             26.9      2.5
-    rps        1253804.8 225541.2
-    r2               0.1      0.2
-    rmse            48.9      6.6
-    acc              0.6      0.0
-    mse           2394.6    644.1
-    crps       1253804.8 225541.2
-    bal_acc          0.5      0.0
-    elpd_loo.1   -6247.5    727.9
-    logscore       -23.8      2.8
-    scrps            NaN      NaN
+              Estimate       SE
+    elpd_loo   -6247.5    727.9
+    p_loo        292.1     73.3
+    looic      12495.0   1455.7
+    srps           NaN      NaN
+    mae           26.9      2.5
+    rps      1253804.8 225541.2
+    r2             0.1      0.2
+    rmse          48.9      6.6
+    acc            0.6      0.0
+    mse         2394.6    644.1
+    crps     1253804.8 225541.2
+    bal_acc        0.5      0.0
+    logscore     -23.8      2.8
+    scrps          NaN      NaN
     ------
     MCSE of elpd_loo is NA.
     MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.2]).

@@ -21,7 +21,7 @@ loo_pred_measure <- function(
   ylp = NULL,
   measure = c(
     "logscore",
-    "elpd", # TODO: note that this is stored in `loo` object already
+    "elpd",
     "r2",
     "rps",
     "crps",
@@ -50,10 +50,26 @@ loo_pred_measure <- function(
     S <- nrow(mupred)
     n <- ncol(mupred)
   }
+  if (
+    is.null(ypred) &&
+      is.null(ylp) &&
+      is.null(mupred) &&
+      !is.null(loo) &&
+      !is.null(loo$log_weights)
+  ) {
+    S <- nrow(loo$log_weights)
+    n <- ncol(loo$log_weights)
+  }
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
   pointwise_col <- .match_loo_pointwise_column(measure)
   results_col <- .match_results_column(measure)
+  use_loo_elpd <- measure == "elpd" &&
+    !is.null(loo) &&
+    !is.null(loo$estimates) &&
+    !is.null(loo$pointwise) &&
+    results_col %in% rownames(loo$estimates) &&
+    pointwise_col %in% colnames(loo$pointwise)
 
   # TODO: move things to common functions so they can be reused in pred_measure()
   # check appropriate arguments for measure
@@ -90,8 +106,12 @@ loo_pred_measure <- function(
         "logscore"
       )
   ) {
-    checkmate::assert_matrix(ylp, nrows = S, ncols = n)
-    args <- list(ylp = ylp)
+    if (!use_loo_elpd) {
+      checkmate::assert_matrix(ylp, nrows = S, ncols = n)
+      args <- list(ylp = ylp)
+    } else {
+      args <- list()
+    }
   }
 
   # Aki said: The arguments are the same except instead of predperf object, loo or psis object can be given. If neither of these is given, but ylp is given then that works as log_lik and psis object is created internally. save_psis would control whether the psis_object is also stored in the returned object.
@@ -132,60 +152,107 @@ loo_pred_measure <- function(
     log_weights <- weights(psis_used)
   }
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
-  args$log_weights <- .standardize_log_weights(log_weights)
+  log_weights_std <- .standardize_log_weights(log_weights)
 
-  if (!is.null(loo) && !is.null(loo$pointwise)) {
-    if (pointwise_col %in% colnames(loo$pointwise)) {
-      args$pointwise <- loo$pointwise[, pointwise_col]
+  if (use_loo_elpd) {
+    measure_values <- list(
+      estimate = loo$estimates[results_col, "Estimate"],
+      se = loo$estimates[results_col, "SE"],
+      pointwise = loo$pointwise[, pointwise_col]
+    )
+  } else {
+    args$log_weights <- log_weights_std
+    if (!is.null(loo) && !is.null(loo$pointwise)) {
+      if (pointwise_col %in% colnames(loo$pointwise)) {
+        args$pointwise <- loo$pointwise[, pointwise_col]
+      }
     }
+    measure_values <- do.call(pred_fun, args)
   }
 
-  measure_values <- do.call(pred_fun, args)
+  base_loo <- NULL
+  if (
+    !is.null(ylp) &&
+      (is.null(loo) || is.null(loo$estimates) || is.null(loo$pointwise))
+  ) {
+    base_elpd <- .elpd_summary(ylp, log_weights_std)
+    lpd_pointwise <- matrixStats::colLogSumExps(ylp) - log(nrow(ylp))
+    p_loo_pointwise <- lpd_pointwise - base_elpd$pointwise
+    p_loo <- list(
+      estimate = sum(p_loo_pointwise),
+      se = n * .se_helper(p_loo_pointwise, mean(p_loo_pointwise), n),
+      pointwise = p_loo_pointwise
+    )
+    looic_pointwise <- -2 * base_elpd$pointwise
+    looic <- list(
+      estimate = sum(looic_pointwise),
+      se = n * .se_helper(looic_pointwise, mean(looic_pointwise), n),
+      pointwise = looic_pointwise
+    )
+    base_loo <- list(
+      estimates = rbind(
+        elpd_loo = c(base_elpd$estimate, base_elpd$se),
+        p_loo = c(p_loo$estimate, p_loo$se),
+        looic = c(looic$estimate, looic$se)
+      ),
+      pointwise = cbind(
+        elpd_loo = base_elpd$pointwise,
+        p_loo = p_loo$pointwise,
+        looic = looic$pointwise
+      )
+    )
+    colnames(base_loo$estimates) <- c("Estimate", "SE")
+  }
 
   if (!is.null(loo) && !is.null(loo$estimates)) {
     estimates <- loo$estimates
+  } else if (!is.null(base_loo)) {
+    estimates <- base_loo$estimates
+  }
+
+  if (is.null(estimates)) {
+    estimates <- matrix(
+      c(measure_values$estimate, measure_values$se),
+      nrow = 1,
+      dimnames = list(results_col, c("Estimate", "SE"))
+    )
+  } else if (results_col %in% rownames(estimates)) {
+    estimates[results_col, ] <- c(measure_values$estimate, measure_values$se)
+  } else {
     new_row <- matrix(
       c(measure_values$estimate, measure_values$se),
       nrow = 1,
       dimnames = list(results_col, colnames(estimates))
     )
     estimates <- rbind(estimates, new_row)
-  } else {
-    # $ estimates  : num [1:4, 1:2] -6.25e+03 2.92e+02 1.25e+04 7.02e-02 7.28e+02 ...
-    # ..- attr(*, "dimnames")=List of 2
-    # .. ..$ : chr [1:4] "elpd_loo" "p_loo" "looic" "r2"
-    # .. ..$ : chr [1:2] "Estimate" "SE"
-    # TODO: by default calculate elpd_loo and p_loo, then append measure estimates so it looks like normal loo output
-    estimates <- matrix(
-      c(measure_values$estimate, measure_values$se),
-      nrow = 1,
-      dimnames = list(results_col, c("Estimate", "SE"))
-    )
   }
+
   if (!is.null(loo) && !is.null(loo$pointwise)) {
-    # TODO: by default calculate elpd_loo then append measure pointwise
     pointwise <- loo$pointwise
-    if (!(pointwise_col %in% colnames(pointwise))) {
-      pointwise <- cbind(
-        pointwise,
-        matrix(
-          measure_values$pointwise,
-          ncol = 1,
-          dimnames = list(NULL, pointwise_col)
-        )
-      )
-    }
-  } else {
+  } else if (!is.null(base_loo)) {
+    pointwise <- base_loo$pointwise
+  }
+  if (is.null(pointwise)) {
     pointwise <- matrix(
       measure_values$pointwise,
       ncol = 1,
       dimnames = list(NULL, pointwise_col)
     )
+  } else if (!(pointwise_col %in% colnames(pointwise))) {
+    pointwise <- cbind(
+      pointwise,
+      matrix(
+        measure_values$pointwise,
+        ncol = 1,
+        dimnames = list(NULL, pointwise_col)
+      )
+    )
+  } else {
+    pointwise[, pointwise_col] <- measure_values$pointwise
   }
   diagnostics <- if (!is.null(loo) && !is.null(loo$diagnostics)) {
     loo$diagnostics
   } else if (!is.null(psis_used)) {
-    # TODO: double check this? This is used when ylp or psis_object are passed
     psis_used$diagnostics
   }
 
