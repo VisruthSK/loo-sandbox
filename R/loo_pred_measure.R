@@ -276,9 +276,21 @@ loo_pred_measure <- function(
 }
 
 #' @export
-print.loo_pred_measure <- function(x, digits = 1, ...) {
-  # TODO: maybe copy implementation over
-  loo:::print.psis_loo(x, digits = digits, ...)
+print.loo_pred_measure <- function(x, digits = 1, plot_k = FALSE, ...) {
+  loo:::print.loo(x, digits = digits, ...)
+  cat("------\n")
+  loo:::print_mcse_summary(x, digits = digits)
+  S <- dim(x)[1]
+  k_threshold <- loo:::ps_khat_threshold(S)
+  if (length(loo:::pareto_k_ids(x, threshold = k_threshold))) {
+    cat("\n")
+  }
+  print(loo:::pareto_k_table(x), digits = digits)
+  cat(loo:::.k_help())
+  if (plot_k) {
+    graphics::plot(x, ...)
+  }
+  invisible(x)
 }
 
 # TODO: pred measure print should have a tag for where the data is from
