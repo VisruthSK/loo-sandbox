@@ -14,7 +14,7 @@ Shared parameters for summary functions
 
 - ylp:
 
-  matrix of posterior draws (S x n) of pointwise LOO log predictive
+  matrix of posterior draws (S x n) of pointwise log predictive
   densities
 
 - mupred:

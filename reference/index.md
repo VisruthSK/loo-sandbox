@@ -6,6 +6,12 @@ Core functions for computing LOO predictive measures
 
 - [`loo_pred_measure()`](https://visruthsk.github.io/loo-sandbox/reference/loo_pred_measure.md)
   : LOO Predictive Measure
+- [`insample_pred_measure()`](https://visruthsk.github.io/loo-sandbox/reference/insample_pred_measure.md)
+  : In-Sample Predictive Measure
+- [`kfold_pred_measure()`](https://visruthsk.github.io/loo-sandbox/reference/kfold_pred_measure.md)
+  : K-fold Predictive Measure
+- [`test_pred_measure()`](https://visruthsk.github.io/loo-sandbox/reference/test_pred_measure.md)
+  : Test-Set Predictive Measure
 
 ## Measures
 

@@ -14,7 +14,7 @@ Shared parameters for pointwise functions
 
 - ylp:
 
-  vector (S) of pointwise LOO log predictive densities
+  vector (S) of pointwise log predictive densities
 
 - mupred:
 

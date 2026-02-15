@@ -1,21 +1,21 @@
-# LOO Predictive Measure
+# K-fold Predictive Measure
 
-LOO Predictive Measure
+K-fold Predictive Measure
 
 ## Usage
 
 ``` r
-loo_pred_measure(
+kfold_pred_measure(
   y = NULL,
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
+  ylp_insample = NULL,
+  fold_id = NULL,
+  predperf = NULL,
   measure = .pred_measure_choices(),
   group_ids = NULL,
-  model_name = NULL,
-  loo = NULL,
-  psis_object = NULL,
-  save_psis = FALSE
+  model_name = NULL
 )
 ```
 
@@ -37,23 +37,23 @@ loo_pred_measure(
 
   Placeholder
 
+- ylp_insample:
+
+  Placeholder
+
+- fold_id:
+
+  Placeholder
+
+- predperf:
+
+  Placeholder
+
 - measure:
 
   Placeholder
 
 - group_ids:
-
-  Placeholder
-
-- loo:
-
-  Placeholder
-
-- psis_object:
-
-  Placeholder
-
-- save_psis:
 
   Placeholder
 
