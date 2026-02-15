@@ -64,12 +64,6 @@ loo_pred_measure <- function(
   pred_fun <- .loo_predictive_measure_fun(measure)
   pointwise_col <- .match_loo_pointwise_column(measure)
   results_col <- .match_results_column(measure)
-  use_loo_elpd <- measure == "elpd" &&
-    !is.null(loo) &&
-    !is.null(loo$estimates) &&
-    !is.null(loo$pointwise) &&
-    results_col %in% rownames(loo$estimates) &&
-    pointwise_col %in% colnames(loo$pointwise)
 
   # TODO: move things to common functions so they can be reused in pred_measure()
   # check appropriate arguments for measure
@@ -106,7 +100,7 @@ loo_pred_measure <- function(
         "logscore"
       )
   ) {
-    if (!use_loo_elpd) {
+    if (!measure == "elpd" && !is.null(loo)) {
       checkmate::assert_matrix(ylp, nrows = S, ncols = n)
       args <- list(ylp = ylp)
     } else {
@@ -114,8 +108,7 @@ loo_pred_measure <- function(
     }
   }
 
-  # Aki said: The arguments are the same except instead of predperf object, loo or psis object can be given. If neither of these is given, but ylp is given then that works as log_lik and psis object is created internally. save_psis would control whether the psis_object is also stored in the returned object.
-
+  # TODO: convert the psis_used stuff to function
   # get log weights from provided psis_object, loo object, or create from log lik
   log_weights <- loo$log_weights
   psis_loo <- loo$psis_object
@@ -154,7 +147,7 @@ loo_pred_measure <- function(
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
   log_weights_std <- .standardize_log_weights(log_weights)
 
-  if (use_loo_elpd) {
+  if (measure == "elpd" && !is.null(loo)) {
     measure_values <- list(
       estimate = loo$estimates[results_col, "Estimate"],
       se = loo$estimates[results_col, "SE"],
@@ -261,15 +254,14 @@ loo_pred_measure <- function(
       estimates = estimates,
       pointwise = pointwise,
       diagnostics = diagnostics,
+      # TODO: add some useful info such as model name, etc.
+      metadata = list(),
       log_weights = log_weights,
       psis_object = if (save_psis) psis_used else NULL
     ),
     class = c(
       "loo_pred_measure",
-      "pred_measure",
-      "psis_loo",
-      "importance_sampling_loo",
-      "loo"
+      "pred_measure"
     ),
     dims = dim(log_weights)
   )
@@ -292,10 +284,6 @@ print.loo_pred_measure <- function(x, digits = 1, plot_k = FALSE, ...) {
   }
   invisible(x)
 }
-
-# TODO: pred measure print should have a tag for where the data is from
-# insample won't be able to estimate effective # of params, but k-fold and test can. That should be handled in print
-# k-fold should store the splits
 
 # ----------------------------- Measures -----------------------------
 

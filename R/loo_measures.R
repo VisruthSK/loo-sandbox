@@ -246,9 +246,7 @@ rps <- function(y, ypred, log_weights) {
 #'
 #' @rdname rps
 #' @export
-crps <- function(y, ypred, log_weights) {
-  rps(y, ypred, log_weights)
-}
+crps <- \(y, ypred, log_weights) rps(y, ypred, log_weights)
 
 #' Scaled Ranked Probability Score
 #'
@@ -274,6 +272,4 @@ srps <- function(y, ypred, log_weights) {
 #'
 #' @rdname rps
 #' @export
-scrps <- function(y, ypred, log_weights) {
-  srps(y, ypred, log_weights)
-}
+scrps <- \(y, ypred, log_weights) srps(y, ypred, log_weights)
