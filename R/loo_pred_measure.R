@@ -1,16 +1,7 @@
 # TODO: document function--look at loo #281
 #' LOO Predictive Measure
 #'
-#' @param y Placeholder
-#' @param ypred Placeholder
-#' @param mupred Placeholder
-#' @param ylp Placeholder
-#' @param loo Placeholder
-#' @param measure Placeholder
-#' @param group_ids Placeholder
-#' @param model_name Placeholder
-#' @param psis_object Placeholder
-#' @param save_psis Placeholder
+#' @inheritParams pred_measure_params
 #'
 #' @return Placeholder
 #'

@@ -18,25 +18,28 @@ kfold_pred_measure(
 )
 }
 \arguments{
-\item{y}{Placeholder}
+\item{y}{vector of observed values (n)}
 
-\item{ypred}{Placeholder}
+\item{ypred}{matrix of posterior predictive draws (S x n)}
 
-\item{mupred}{Placeholder}
+\item{mupred}{matrix of posterior point predictions (S x n)}
 
-\item{ylp}{Placeholder}
+\item{ylp}{matrix of pointwise log predictive densities (S x n)}
 
-\item{ylp_insample}{Placeholder}
+\item{ylp_insample}{optional matrix of in-sample pointwise log predictive
+densities (S x n), used for effective number of parameters in out-of-sample
+settings}
 
-\item{fold_id}{Placeholder}
+\item{fold_id}{vector of fold ids (required for k-fold wrappers)}
 
-\item{predperf}{Placeholder}
+\item{predperf}{existing predictive measure object to update/accumulate
+additional metrics}
 
-\item{measure}{Placeholder}
+\item{measure}{predictive metric to compute}
 
-\item{group_ids}{Placeholder}
+\item{group_ids}{optional grouping ids}
 
-\item{model_name}{Placeholder}
+\item{model_name}{optional model label stored in metadata}
 }
 \value{
 Placeholder

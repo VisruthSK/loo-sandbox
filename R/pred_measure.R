@@ -1,13 +1,30 @@
+#' Shared parameters for predictive measure wrappers
+#'
+#' @param y vector of observed values (n)
+#' @param ypred matrix of posterior predictive draws (S x n)
+#' @param mupred matrix of posterior point predictions (S x n)
+#' @param ylp matrix of pointwise log predictive densities (S x n)
+#' @param ylp_insample optional matrix of in-sample pointwise log predictive
+#'   densities (S x n), used for effective number of parameters in out-of-sample
+#'   settings
+#' @param predperf existing predictive measure object to update/accumulate
+#'   additional metrics
+#' @param measure predictive metric to compute
+#' @param group_ids optional grouping ids
+#' @param model_name optional model label stored in metadata
+#' @param fold_id vector of fold ids (required for k-fold wrappers)
+#' @param loo `loo` object, preferably fit with `save_psis = TRUE`
+#' @param psis_object optional `psis` object used to derive LOO weights
+#' @param save_psis logical; if `TRUE`, store the `psis` object in output for
+#'   LOO paths
+#'
+#' @keywords internal
+#' @name pred_measure_params
+NULL
+
 #' In-Sample Predictive Measure
 #'
-#' @param y Placeholder
-#' @param ypred Placeholder
-#' @param mupred Placeholder
-#' @param ylp Placeholder
-#' @param predperf Placeholder
-#' @param measure Placeholder
-#' @param group_ids Placeholder
-#' @param model_name Placeholder
+#' @inheritParams pred_measure_params
 #'
 #' @return Placeholder
 #'
@@ -41,16 +58,7 @@ insample_pred_measure <- function(
 
 #' K-fold Predictive Measure
 #'
-#' @param y Placeholder
-#' @param ypred Placeholder
-#' @param mupred Placeholder
-#' @param ylp Placeholder
-#' @param ylp_insample Placeholder
-#' @param fold_id Placeholder
-#' @param predperf Placeholder
-#' @param measure Placeholder
-#' @param group_ids Placeholder
-#' @param model_name Placeholder
+#' @inheritParams pred_measure_params
 #'
 #' @return Placeholder
 #'
@@ -86,15 +94,7 @@ kfold_pred_measure <- function(
 
 #' Test-Set Predictive Measure
 #'
-#' @param y Placeholder
-#' @param ypred Placeholder
-#' @param mupred Placeholder
-#' @param ylp Placeholder
-#' @param ylp_insample Placeholder
-#' @param predperf Placeholder
-#' @param measure Placeholder
-#' @param group_ids Placeholder
-#' @param model_name Placeholder
+#' @inheritParams pred_measure_params
 #'
 #' @return Placeholder
 #'
