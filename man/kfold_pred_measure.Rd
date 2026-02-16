@@ -13,7 +13,8 @@ kfold_pred_measure(
   fold_id = NULL,
   predperf = NULL,
   measure = .pred_measure_choices(),
-  group_ids = NULL
+  group_ids = NULL,
+  model_name = NULL
 )
 }
 \arguments{

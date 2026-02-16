@@ -11,6 +11,7 @@ loo_pred_measure(
   ylp = NULL,
   measure = .pred_measure_choices(),
   group_ids = NULL,
+  model_name = NULL,
   loo = NULL,
   psis_object = NULL,
   save_psis = FALSE

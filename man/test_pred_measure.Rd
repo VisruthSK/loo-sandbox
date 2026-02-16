@@ -12,7 +12,8 @@ test_pred_measure(
   ylp_insample = NULL,
   predperf = NULL,
   measure = .pred_measure_choices(),
-  group_ids = NULL
+  group_ids = NULL,
+  model_name = NULL
 )
 }
 \arguments{
