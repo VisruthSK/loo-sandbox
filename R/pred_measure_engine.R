@@ -124,7 +124,8 @@
         "No possible way to obtain log-weights. Pass psis object, loo object with the argument `save_psis = TRUE`, or ylp."
       )
     }
-    psis_used <- psis(ylp)
+    # `loo::loo()` computes PSIS from negative log-likelihood ratios.
+    psis_used <- psis(-ylp)
   }
 
   if (is.null(log_weights)) {

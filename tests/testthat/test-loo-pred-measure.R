@@ -93,3 +93,32 @@ test_that("loo_pred_measure stores model_name metadata", {
   )
   expect_equal(result$metadata$model_name, "fit_lin")
 })
+
+test_that("loo_pred_measure fallback PSIS path matches loo::loo", {
+  inputs <- roaches_models$model1
+  ll <- inputs$ylp
+
+  ref <- suppressWarnings(loo::loo(ll, r_eff = 1, save_psis = TRUE))
+  ref_log_weights <- stats::weights(
+    ref$psis_object,
+    normalize = TRUE,
+    log = TRUE
+  )
+  result <- suppressWarnings(
+    loo_pred_measure(
+      ylp = ll,
+      measure = "elpd"
+    )
+  )
+
+  expect_equal(result$log_weights, ref_log_weights)
+  expect_equal(result$pointwise[, "elpd"], ref$pointwise[, "elpd_loo"])
+  expect_equal(
+    result$estimates["elpd", "Estimate"],
+    ref$estimates["elpd_loo", "Estimate"]
+  )
+  expect_equal(
+    result$estimates["elpd", "SE"],
+    ref$estimates["elpd_loo", "SE"]
+  )
+})
