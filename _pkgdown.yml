@@ -13,6 +13,9 @@ reference:
   desc: "Core functions for computing LOO predictive measures"
   contents:
   - starts_with("loo_")
+  - insample_pred_measure
+  - kfold_pred_measure
+  - test_pred_measure
 - title: "Measures"
   contents:
   - acc
