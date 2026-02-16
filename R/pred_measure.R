@@ -143,7 +143,10 @@ print.pred_measure <- function(x, digits = 1, ...) {
     )
   }
   cat(sprintf("Data source: %s\n\n", source))
-  print(loo:::.fr(as.data.frame(x$estimates), digits), quote = FALSE)
+  print(
+    format(round(as.data.frame(x$estimates), digits), nsmall = digits),
+    quote = FALSE
+  )
   invisible(x)
 }
 

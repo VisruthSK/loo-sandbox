@@ -74,7 +74,9 @@ run_wrapper_test <- function(
         stop("Unknown wrapper: ", wrapper_name)
       )
 
+      # jarl-ignore internal_function: testing internals
       results_col <- loosandbox:::.match_results_column(measure)
+      # jarl-ignore internal_function: testing internals
       pointwise_col <- loosandbox:::.match_pointwise_column(measure)
       expect_equal(
         result$estimate,
