@@ -8,6 +8,7 @@
 #' @param loo Placeholder
 #' @param measure Placeholder
 #' @param group_ids Placeholder
+#' @param model_name Placeholder
 #' @param psis_object Placeholder
 #' @param save_psis Placeholder
 #'

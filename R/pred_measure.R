@@ -7,6 +7,7 @@
 #' @param predperf Placeholder
 #' @param measure Placeholder
 #' @param group_ids Placeholder
+#' @param model_name Placeholder
 #'
 #' @return Placeholder
 #'
@@ -49,6 +50,7 @@ insample_pred_measure <- function(
 #' @param predperf Placeholder
 #' @param measure Placeholder
 #' @param group_ids Placeholder
+#' @param model_name Placeholder
 #'
 #' @return Placeholder
 #'
@@ -92,6 +94,7 @@ kfold_pred_measure <- function(
 #' @param predperf Placeholder
 #' @param measure Placeholder
 #' @param group_ids Placeholder
+#' @param model_name Placeholder
 #'
 #' @return Placeholder
 #'

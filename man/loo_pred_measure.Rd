@@ -30,6 +30,8 @@ loo_pred_measure(
 
 \item{group_ids}{Placeholder}
 
+\item{model_name}{Placeholder}
+
 \item{loo}{Placeholder}
 
 \item{psis_object}{Placeholder}

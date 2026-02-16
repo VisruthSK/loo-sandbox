@@ -29,6 +29,8 @@ insample_pred_measure(
 \item{measure}{Placeholder}
 
 \item{group_ids}{Placeholder}
+
+\item{model_name}{Placeholder}
 }
 \value{
 Placeholder
