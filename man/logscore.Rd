@@ -7,7 +7,7 @@
 logscore(ylp, log_weights)
 }
 \arguments{
-\item{ylp}{matrix of posterior draws (S x n) of pointwise LOO log predictive densities}
+\item{ylp}{matrix of posterior draws (S x n) of pointwise log predictive densities}
 
 \item{log_weights}{matrix of standardized loo weights (S x n) on the log scale}
 }

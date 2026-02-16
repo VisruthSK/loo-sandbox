@@ -8,7 +8,7 @@
 
 \item{ypred}{vector (S) of posterior predictive draws}
 
-\item{ylp}{vector (S) of pointwise LOO log predictive densities}
+\item{ylp}{vector (S) of pointwise log predictive densities}
 
 \item{mupred}{vector (S) of point predictions}
 

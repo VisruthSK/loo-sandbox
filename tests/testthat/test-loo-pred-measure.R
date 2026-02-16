@@ -9,11 +9,11 @@ test_that("loo_pred_measure adds base loo summaries without loo object", {
   )
 
   expect_true(
-    all(c("elpd_loo", "p_loo", "looic", "r2") %in% rownames(result$estimates))
+    all(c("elpd", "p_eff", "ic", "r2") %in% rownames(result$estimates))
   )
   expect_true(
     all(
-      c("elpd_loo", "p_loo", "looic", "squared_error_loo") %in%
+      c("elpd", "p_eff", "ic", "squared_error") %in%
         colnames(result$pointwise)
     )
   )

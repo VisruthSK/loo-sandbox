@@ -8,7 +8,7 @@
 
 \item{ypred}{matrix of posterior draws (S x n) of posterior predictive draws}
 
-\item{ylp}{matrix of posterior draws (S x n) of pointwise LOO log predictive densities}
+\item{ylp}{matrix of posterior draws (S x n) of pointwise log predictive densities}
 
 \item{mupred}{matrix of posterior draws (S x n) of point predictions}
 

@@ -62,7 +62,7 @@ loo_pred_measure <- function(
   }
   measure <- match.arg(measure)
   pred_fun <- .loo_predictive_measure_fun(measure)
-  pointwise_col <- .match_loo_pointwise_column(measure)
+  pointwise_col <- .match_pointwise_column(measure)
   results_col <- .match_results_column(measure)
 
   # TODO: move things to common functions so they can be reused in pred_measure()
@@ -163,44 +163,44 @@ loo_pred_measure <- function(
     measure_values <- do.call(pred_fun, args)
   }
 
-  base_loo <- NULL
+  base_measure <- NULL
   if (
     !is.null(ylp) &&
       (is.null(loo) || is.null(loo$estimates) || is.null(loo$pointwise))
   ) {
     base_elpd <- .elpd_summary(ylp, log_weights_std)
     lpd_pointwise <- matrixStats::colLogSumExps(ylp) - log(nrow(ylp))
-    p_loo_pointwise <- lpd_pointwise - base_elpd$pointwise
-    p_loo <- list(
-      estimate = sum(p_loo_pointwise),
-      se = n * .se_helper(p_loo_pointwise, mean(p_loo_pointwise), n),
-      pointwise = p_loo_pointwise
+    p_eff_pointwise <- lpd_pointwise - base_elpd$pointwise
+    p_eff <- list(
+      estimate = sum(p_eff_pointwise),
+      se = n * .se_helper(p_eff_pointwise, mean(p_eff_pointwise), n),
+      pointwise = p_eff_pointwise
     )
-    looic_pointwise <- -2 * base_elpd$pointwise
-    looic <- list(
-      estimate = sum(looic_pointwise),
-      se = n * .se_helper(looic_pointwise, mean(looic_pointwise), n),
-      pointwise = looic_pointwise
+    ic_pointwise <- -2 * base_elpd$pointwise
+    ic <- list(
+      estimate = sum(ic_pointwise),
+      se = n * .se_helper(ic_pointwise, mean(ic_pointwise), n),
+      pointwise = ic_pointwise
     )
-    base_loo <- list(
+    base_measure <- list(
       estimates = rbind(
-        elpd_loo = c(base_elpd$estimate, base_elpd$se),
-        p_loo = c(p_loo$estimate, p_loo$se),
-        looic = c(looic$estimate, looic$se)
+        elpd = c(base_elpd$estimate, base_elpd$se),
+        p_eff = c(p_eff$estimate, p_eff$se),
+        ic = c(ic$estimate, ic$se)
       ),
       pointwise = cbind(
-        elpd_loo = base_elpd$pointwise,
-        p_loo = p_loo$pointwise,
-        looic = looic$pointwise
+        elpd = base_elpd$pointwise,
+        p_eff = p_eff$pointwise,
+        ic = ic$pointwise
       )
     )
-    colnames(base_loo$estimates) <- c("Estimate", "SE")
+    colnames(base_measure$estimates) <- c("Estimate", "SE")
   }
 
   if (!is.null(loo) && !is.null(loo$estimates)) {
     estimates <- loo$estimates
-  } else if (!is.null(base_loo)) {
-    estimates <- base_loo$estimates
+  } else if (!is.null(base_measure)) {
+    estimates <- base_measure$estimates
   }
 
   if (is.null(estimates)) {
@@ -222,8 +222,8 @@ loo_pred_measure <- function(
 
   if (!is.null(loo) && !is.null(loo$pointwise)) {
     pointwise <- loo$pointwise
-  } else if (!is.null(base_loo)) {
-    pointwise <- base_loo$pointwise
+  } else if (!is.null(base_measure)) {
+    pointwise <- base_measure$pointwise
   }
   if (is.null(pointwise)) {
     pointwise <- matrix(
@@ -342,23 +342,22 @@ print.loo_pred_measure <- function(x, digits = 1, plot_k = FALSE, ...) {
 #' @noRd
 #' @param measure The measure used.
 #' @return The column name in the loo pointwise matrix for the given measure.
-.match_loo_pointwise_column <- function(measure) {
-  # TODO: maybe remove _loo but would be breaking change
+.match_pointwise_column <- function(measure) {
   switch(
     measure,
-    "elpd" = "elpd_loo",
-    "logscore" = "elpd_loo",
-    "mlpd" = "elpd_loo",
-    "mae" = "squared_error_loo",
-    "r2" = "squared_error_loo",
-    "rmse" = "squared_error_loo",
-    "mse" = "squared_error_loo",
-    "acc" = "accuracy_loo",
-    "balanced_acc" = "accuracy_loo",
-    "rps" = "rps_loo",
-    "crps" = "crps_loo",
-    "srps" = "srps_loo",
-    "scrps" = "scrps_loo"
+    "elpd" = "elpd",
+    "logscore" = "elpd",
+    "mlpd" = "elpd",
+    "mae" = "squared_error",
+    "r2" = "squared_error",
+    "rmse" = "squared_error",
+    "mse" = "squared_error",
+    "acc" = "accuracy",
+    "balanced_acc" = "accuracy",
+    "rps" = "rps",
+    "crps" = "crps",
+    "srps" = "srps",
+    "scrps" = "scrps"
   )
 }
 
@@ -370,7 +369,7 @@ print.loo_pred_measure <- function(x, digits = 1, plot_k = FALSE, ...) {
 .match_results_column <- function(measure) {
   switch(
     measure,
-    "elpd" = "elpd_loo", # _loo is for backward compat
+    "elpd" = "elpd",
     "logscore" = "logscore",
     "mlpd" = "mpld",
     "mae" = "mae",
