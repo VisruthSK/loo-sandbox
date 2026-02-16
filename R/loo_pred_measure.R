@@ -19,268 +19,60 @@ loo_pred_measure <- function(
   ypred = NULL,
   mupred = NULL,
   ylp = NULL,
-  measure = c(
-    "logscore",
-    "elpd",
-    "r2",
-    "rps",
-    "crps",
-    "srps",
-    "scrps",
-    "mae",
-    "rmse",
-    "mse",
-    "acc",
-    # "energy",
-    "balanced_acc"
-  ),
+  measure = .pred_measure_choices(),
   group_ids = NULL,
   loo = NULL, # This `loo` object needs to be fit with `save_psis = TRUE`
   psis_object = NULL,
   save_psis = FALSE
 ) {
-  # TODO: refactor this--ypred etc could be functions; ask Aki. Could maybe use S7 multiple dispatch?
-  if (!is.null(ypred)) {
-    S <- nrow(ypred)
-    n <- ncol(ypred)
-  } else if (!is.null(ylp)) {
-    S <- nrow(ylp)
-    n <- ncol(ylp)
-  } else if (!is.null(mupred)) {
-    S <- nrow(mupred)
-    n <- ncol(mupred)
-  }
-  if (
-    is.null(ypred) &&
-      is.null(ylp) &&
-      is.null(mupred) &&
-      !is.null(loo) &&
-      !is.null(loo$log_weights)
-  ) {
-    S <- nrow(loo$log_weights)
-    n <- ncol(loo$log_weights)
-  }
-  measure <- match.arg(measure)
-  pred_fun <- .loo_predictive_measure_fun(measure)
-  pointwise_col <- .match_pointwise_column(measure)
-  results_col <- .match_results_column(measure)
-
-  # TODO: move things to common functions so they can be reused in pred_measure()
-  # check appropriate arguments for measure
-  if (
-    measure %in%
-      c(
-        "mae",
-        "mse",
-        "rmse",
-        "r2",
-        "acc",
-        "balanced_acc"
-      )
-  ) {
-    # TODO: better error messages here
-    checkmate::assert_matrix(mupred, nrows = S, ncols = n)
-    args <- list(y = y, mupred = mupred)
-  } else if (
-    measure %in%
-      c(
-        "rps",
-        "crps",
-        # "energy",
-        "srps",
-        "scrps"
-      )
-  ) {
-    checkmate::assert_matrix(ypred, nrows = S, ncols = n)
-    args <- list(y = y, ypred = ypred)
-  } else if (
-    measure %in%
-      c(
-        "elpd",
-        "logscore"
-      )
-  ) {
-    if (!measure == "elpd" && !is.null(loo)) {
-      checkmate::assert_matrix(ylp, nrows = S, ncols = n)
-      args <- list(ylp = ylp)
-    } else {
-      args <- list()
-    }
-  }
-
-  # TODO: convert the psis_used stuff to function
-  # get log weights from provided psis_object, loo object, or create from log lik
-  log_weights <- loo$log_weights
-  psis_loo <- loo$psis_object
-  has_psis_arg <- !missing(psis_object) && !is.null(psis_object)
-  has_loo_psis <- !is.null(psis_loo)
-
-  if (has_psis_arg && has_loo_psis) {
-    warning(
-      "Passing both PSIS and loo objects is not advised--defaulting to getting log-weights from loo object."
-    )
-    psis_used <- psis_loo
-  } else if (has_loo_psis) {
-    if (!is.psis(psis_loo)) {
-      stop(
-        "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
-      )
-    }
-    psis_used <- psis_loo
-  } else if (has_psis_arg) {
-    if (!is.psis(psis_object)) {
-      stop("Provided `psis_object` is not a valid `psis` object.")
-    }
-    psis_used <- psis_object
-  } else if (is.null(log_weights)) {
-    if (is.null(ylp)) {
-      stop(
-        "No possible way to obtain log-weights. Pass psis object, loo object with the argument `save_psis = TRUE`, or ylp."
-      )
-    }
-    psis_used <- psis(ylp)
-  }
-
-  if (is.null(log_weights)) {
-    log_weights <- weights(psis_used)
-  }
-  checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
-  log_weights_std <- .standardize_log_weights(log_weights)
-
-  if (measure == "elpd" && !is.null(loo)) {
-    measure_values <- list(
-      estimate = loo$estimates[results_col, "Estimate"],
-      se = loo$estimates[results_col, "SE"],
-      pointwise = loo$pointwise[, pointwise_col]
-    )
-  } else {
-    args$log_weights <- log_weights_std
-    if (!is.null(loo) && !is.null(loo$pointwise)) {
-      if (pointwise_col %in% colnames(loo$pointwise)) {
-        args$pointwise <- loo$pointwise[, pointwise_col]
-      }
-    }
-    measure_values <- do.call(pred_fun, args)
-  }
-
-  base_measure <- NULL
-  if (
-    !is.null(ylp) &&
-      (is.null(loo) || is.null(loo$estimates) || is.null(loo$pointwise))
-  ) {
-    base_elpd <- .elpd_summary(ylp, log_weights_std)
-    lpd_pointwise <- matrixStats::colLogSumExps(ylp) - log(nrow(ylp))
-    p_eff_pointwise <- lpd_pointwise - base_elpd$pointwise
-    p_eff <- list(
-      estimate = sum(p_eff_pointwise),
-      se = n * .se_helper(p_eff_pointwise, mean(p_eff_pointwise), n),
-      pointwise = p_eff_pointwise
-    )
-    ic_pointwise <- -2 * base_elpd$pointwise
-    ic <- list(
-      estimate = sum(ic_pointwise),
-      se = n * .se_helper(ic_pointwise, mean(ic_pointwise), n),
-      pointwise = ic_pointwise
-    )
-    base_measure <- list(
-      estimates = rbind(
-        elpd = c(base_elpd$estimate, base_elpd$se),
-        p_eff = c(p_eff$estimate, p_eff$se),
-        ic = c(ic$estimate, ic$se)
-      ),
-      pointwise = cbind(
-        elpd = base_elpd$pointwise,
-        p_eff = p_eff$pointwise,
-        ic = ic$pointwise
-      )
-    )
-    colnames(base_measure$estimates) <- c("Estimate", "SE")
-  }
-
-  if (!is.null(loo) && !is.null(loo$estimates)) {
-    estimates <- loo$estimates
-  } else if (!is.null(base_measure)) {
-    estimates <- base_measure$estimates
-  }
-
-  if (is.null(estimates)) {
-    estimates <- matrix(
-      c(measure_values$estimate, measure_values$se),
-      nrow = 1,
-      dimnames = list(results_col, c("Estimate", "SE"))
-    )
-  } else if (results_col %in% rownames(estimates)) {
-    estimates[results_col, ] <- c(measure_values$estimate, measure_values$se)
-  } else {
-    new_row <- matrix(
-      c(measure_values$estimate, measure_values$se),
-      nrow = 1,
-      dimnames = list(results_col, colnames(estimates))
-    )
-    estimates <- rbind(estimates, new_row)
-  }
-
-  if (!is.null(loo) && !is.null(loo$pointwise)) {
-    pointwise <- loo$pointwise
-  } else if (!is.null(base_measure)) {
-    pointwise <- base_measure$pointwise
-  }
-  if (is.null(pointwise)) {
-    pointwise <- matrix(
-      measure_values$pointwise,
-      ncol = 1,
-      dimnames = list(NULL, pointwise_col)
-    )
-  } else if (!(pointwise_col %in% colnames(pointwise))) {
-    pointwise <- cbind(
-      pointwise,
-      matrix(
-        measure_values$pointwise,
-        ncol = 1,
-        dimnames = list(NULL, pointwise_col)
-      )
-    )
-  } else {
-    pointwise[, pointwise_col] <- measure_values$pointwise
-  }
-  diagnostics <- if (!is.null(loo) && !is.null(loo$diagnostics)) {
-    loo$diagnostics
-  } else if (!is.null(psis_used)) {
-    psis_used$diagnostics
-  }
-
-  structure(
-    list(
-      estimates = estimates,
-      pointwise = pointwise,
-      diagnostics = diagnostics,
-      # TODO: add some useful info such as model name, etc.
-      metadata = list(),
-      log_weights = log_weights,
-      psis_object = if (save_psis) psis_used else NULL
-    ),
-    class = c(
-      "loo_pred_measure",
-      "pred_measure"
-    ),
-    dims = dim(log_weights)
+  .pred_measure_engine(
+    source = "loo",
+    y = y,
+    ypred = ypred,
+    mupred = mupred,
+    ylp = ylp,
+    ylp_insample = NULL,
+    measure = measure,
+    predperf = loo,
+    fold_id = NULL,
+    group_ids = group_ids,
+    psis_object = psis_object,
+    save_psis = save_psis
   )
 }
 
 #' @export
 print.loo_pred_measure <- function(x, digits = 1, plot_k = FALSE, ...) {
-  loo:::print.loo(x, digits = digits, ...)
+  print.pred_measure(x, digits = digits, ...)
   cat("------\n")
-  loo:::print_mcse_summary(x, digits = digits)
-  S <- dim(x)[1]
-  k_threshold <- loo:::ps_khat_threshold(S)
-  if (length(loo:::pareto_k_ids(x, threshold = k_threshold))) {
-    cat("\n")
+  pareto_k <- x$diagnostics$pareto_k
+  if (is.null(pareto_k)) {
+    cat("No Pareto-k diagnostics available.\n")
+    return(invisible(x))
   }
-  print(loo:::pareto_k_table(x), digits = digits)
-  cat(loo:::.k_help())
+  n <- length(pareto_k)
+  bins <- cut(
+    pareto_k,
+    breaks = c(-Inf, 0.7, 1, Inf),
+    labels = c("good", "bad", "very bad"),
+    include.lowest = TRUE
+  )
+  counts <- table(bins)
+  count_good <- if ("good" %in% names(counts)) as.integer(counts["good"]) else 0L
+  count_bad <- if ("bad" %in% names(counts)) as.integer(counts["bad"]) else 0L
+  count_vbad <- if ("very bad" %in% names(counts)) as.integer(counts["very bad"]) else 0L
+  cat("Pareto k diagnostic values:\n")
+  cat(sprintf("  good (k <= 0.7): %d (%.1f%%)\n", count_good, 100 * count_good / n))
+  cat(sprintf("  bad (0.7 < k <= 1): %d (%.1f%%)\n", count_bad, 100 * count_bad / n))
+  cat(sprintf("  very bad (k > 1): %d (%.1f%%)\n", count_vbad, 100 * count_vbad / n))
   if (plot_k) {
-    graphics::plot(x, ...)
+    graphics::plot(
+      pareto_k,
+      ylab = "Pareto-k",
+      xlab = "Observation",
+      main = "Pareto-k diagnostics",
+      pch = 16
+    )
   }
   invisible(x)
 }
