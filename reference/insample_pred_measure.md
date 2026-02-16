@@ -21,31 +21,36 @@ insample_pred_measure(
 
 - y:
 
-  Placeholder
+  vector of observed values (n)
 
 - ypred:
 
-  Placeholder
+  matrix of posterior predictive draws (S x n)
 
 - mupred:
 
-  Placeholder
+  matrix of posterior point predictions (S x n)
 
 - ylp:
 
-  Placeholder
+  matrix of pointwise log predictive densities (S x n)
 
 - predperf:
 
-  Placeholder
+  existing predictive measure object to update/accumulate additional
+  metrics
 
 - measure:
 
-  Placeholder
+  predictive metric to compute
 
 - group_ids:
 
-  Placeholder
+  optional grouping ids
+
+- model_name:
+
+  optional model label stored in metadata
 
 ## Value
 

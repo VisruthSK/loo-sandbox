@@ -1,23 +1,6 @@
-# LOO Predictive Measure
+# Shared parameters for predictive measure wrappers
 
-LOO Predictive Measure
-
-## Usage
-
-``` r
-loo_pred_measure(
-  y = NULL,
-  ypred = NULL,
-  mupred = NULL,
-  ylp = NULL,
-  measure = .pred_measure_choices(),
-  group_ids = NULL,
-  model_name = NULL,
-  loo = NULL,
-  psis_object = NULL,
-  save_psis = FALSE
-)
-```
+Shared parameters for predictive measure wrappers
 
 ## Arguments
 
@@ -37,6 +20,16 @@ loo_pred_measure(
 
   matrix of pointwise log predictive densities (S x n)
 
+- ylp_insample:
+
+  optional matrix of in-sample pointwise log predictive densities (S x
+  n), used for effective number of parameters in out-of-sample settings
+
+- predperf:
+
+  existing predictive measure object to update/accumulate additional
+  metrics
+
 - measure:
 
   predictive metric to compute
@@ -49,6 +42,10 @@ loo_pred_measure(
 
   optional model label stored in metadata
 
+- fold_id:
+
+  vector of fold ids (required for k-fold wrappers)
+
 - loo:
 
   `loo` object, preferably fit with `save_psis = TRUE`
@@ -60,7 +57,3 @@ loo_pred_measure(
 - save_psis:
 
   logical; if `TRUE`, store the `psis` object in output for LOO paths
-
-## Value
-
-Placeholder

@@ -87,39 +87,46 @@
 
 
 <dl><dt id="arg-y">y<a class="anchor" aria-label="anchor" href="#arg-y"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>vector of observed values (n)</p></dd>
 
 
 <dt id="arg-ypred">ypred<a class="anchor" aria-label="anchor" href="#arg-ypred"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>matrix of posterior predictive draws (S x n)</p></dd>
 
 
 <dt id="arg-mupred">mupred<a class="anchor" aria-label="anchor" href="#arg-mupred"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>matrix of posterior point predictions (S x n)</p></dd>
 
 
 <dt id="arg-ylp">ylp<a class="anchor" aria-label="anchor" href="#arg-ylp"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>matrix of pointwise log predictive densities (S x n)</p></dd>
 
 
 <dt id="arg-ylp-insample">ylp_insample<a class="anchor" aria-label="anchor" href="#arg-ylp-insample"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>optional matrix of in-sample pointwise log predictive
+densities (S x n), used for effective number of parameters in out-of-sample
+settings</p></dd>
 
 
 <dt id="arg-fold-id">fold_id<a class="anchor" aria-label="anchor" href="#arg-fold-id"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>vector of fold ids (required for k-fold wrappers)</p></dd>
 
 
 <dt id="arg-predperf">predperf<a class="anchor" aria-label="anchor" href="#arg-predperf"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>existing predictive measure object to update/accumulate
+additional metrics</p></dd>
 
 
 <dt id="arg-measure">measure<a class="anchor" aria-label="anchor" href="#arg-measure"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>predictive metric to compute</p></dd>
 
 
 <dt id="arg-group-ids">group_ids<a class="anchor" aria-label="anchor" href="#arg-group-ids"></a></dt>
-<dd><p>Placeholder</p></dd>
+<dd><p>optional grouping ids</p></dd>
+
+
+<dt id="arg-model-name">model_name<a class="anchor" aria-label="anchor" href="#arg-model-name"></a></dt>
+<dd><p>optional model label stored in metadata</p></dd>
 
 </dl></div>
     <div class="section level2">
