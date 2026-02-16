@@ -21,6 +21,7 @@ loo_pred_measure <- function(
   ylp = NULL,
   measure = .pred_measure_choices(),
   group_ids = NULL,
+  model_name = NULL,
   loo = NULL, # This `loo` object needs to be fit with `save_psis = TRUE`
   psis_object = NULL,
   save_psis = FALSE
@@ -36,6 +37,7 @@ loo_pred_measure <- function(
     predperf = loo,
     fold_id = NULL,
     group_ids = group_ids,
+    model_name = model_name,
     psis_object = psis_object,
     save_psis = save_psis
   )

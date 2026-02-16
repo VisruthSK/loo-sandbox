@@ -1,6 +1,7 @@
 .pred_measure_choices <- function() {
   c(
     "logscore",
+    "mlpd",
     "elpd",
     "r2",
     "rps",
@@ -22,13 +23,13 @@
   mupred,
   fallback_log_weights = NULL
 ) {
-  if (!is.null(ypred)) {
+  if (!is.null(ypred) && !is.null(dim(ypred))) {
     return(c(nrow(ypred), ncol(ypred)))
   }
-  if (!is.null(ylp)) {
+  if (!is.null(ylp) && !is.null(dim(ylp))) {
     return(c(nrow(ylp), ncol(ylp)))
   }
-  if (!is.null(mupred)) {
+  if (!is.null(mupred) && !is.null(dim(mupred))) {
     return(c(nrow(mupred), ncol(mupred)))
   }
   if (!is.null(fallback_log_weights)) {
@@ -82,7 +83,8 @@
     measure %in%
       c(
         "elpd",
-        "logscore"
+        "logscore",
+        "mlpd"
       )
   ) {
     checkmate::assert_matrix(ylp, nrows = S, ncols = n)
@@ -219,6 +221,47 @@
   cbind(pointwise, matrix(values, ncol = 1, dimnames = list(NULL, col_name)))
 }
 
+.coerce_nonloo_matrix_input <- function(x) {
+  if (is.null(x) || !is.null(dim(x))) {
+    return(x)
+  }
+  if (!is.atomic(x)) {
+    return(x)
+  }
+  matrix(x, nrow = 1)
+}
+
+.assert_predperf_compatibility <- function(source, predperf) {
+  if (is.null(predperf)) {
+    return(invisible(NULL))
+  }
+
+  if (source == "loo") {
+    if (!inherits(predperf, "loo") && !inherits(predperf, "loo_pred_measure")) {
+      stop("`loo` must be a `loo` object.")
+    }
+    return(invisible(NULL))
+  }
+
+  if (inherits(predperf, "loo")) {
+    stop("`predperf` cannot be a `loo` object for non-LOO predictive measures.")
+  }
+  if (!inherits(predperf, "pred_measure")) {
+    stop("`predperf` must be a prediction measure object.")
+  }
+
+  expected_class <- switch(
+    source,
+    insample = "insample_pred_measure",
+    kfold = "kfold_pred_measure",
+    test = "test_pred_measure"
+  )
+  if (!inherits(predperf, expected_class)) {
+    stop("`predperf` must inherit from `", expected_class, "`.")
+  }
+  invisible(NULL)
+}
+
 .pred_measure_engine <- function(
   source = c("loo", "insample", "kfold", "test"),
   y = NULL,
@@ -230,6 +273,7 @@
   predperf = NULL,
   fold_id = NULL,
   group_ids = NULL,
+  model_name = NULL,
   psis_object = NULL,
   save_psis = FALSE
 ) {
@@ -240,8 +284,12 @@
     stop("`fold_id` is required for `kfold_pred_measure()`.")
   }
 
-  if (!is.null(predperf) && !is.list(predperf)) {
-    stop("`predperf` must be a prediction measure object.")
+  .assert_predperf_compatibility(source, predperf)
+
+  if (source != "loo") {
+    mupred <- .coerce_nonloo_matrix_input(mupred)
+    ylp <- .coerce_nonloo_matrix_input(ylp)
+    ylp_insample <- .coerce_nonloo_matrix_input(ylp_insample)
   }
 
   dims <- .infer_measure_dims(ypred, ylp, mupred, predperf$log_weights)
@@ -364,6 +412,9 @@
   metadata$source <- source
   if (!is.null(group_ids)) {
     metadata$group_ids <- group_ids
+  }
+  if (!is.null(model_name)) {
+    metadata$model_name <- model_name
   }
   if (source == "kfold") {
     metadata$fold_id <- fold_id

@@ -18,7 +18,8 @@ insample_pred_measure <- function(
   ylp = NULL,
   predperf = NULL,
   measure = .pred_measure_choices(),
-  group_ids = NULL
+  group_ids = NULL,
+  model_name = NULL
 ) {
   .pred_measure_engine(
     source = "insample",
@@ -31,6 +32,7 @@ insample_pred_measure <- function(
     predperf = predperf,
     fold_id = NULL,
     group_ids = group_ids,
+    model_name = model_name,
     psis_object = NULL,
     save_psis = FALSE
   )
@@ -60,7 +62,8 @@ kfold_pred_measure <- function(
   fold_id = NULL,
   predperf = NULL,
   measure = .pred_measure_choices(),
-  group_ids = NULL
+  group_ids = NULL,
+  model_name = NULL
 ) {
   .pred_measure_engine(
     source = "kfold",
@@ -73,6 +76,7 @@ kfold_pred_measure <- function(
     predperf = predperf,
     fold_id = fold_id,
     group_ids = group_ids,
+    model_name = model_name,
     psis_object = NULL,
     save_psis = FALSE
   )
@@ -100,7 +104,8 @@ test_pred_measure <- function(
   ylp_insample = NULL,
   predperf = NULL,
   measure = .pred_measure_choices(),
-  group_ids = NULL
+  group_ids = NULL,
+  model_name = NULL
 ) {
   .pred_measure_engine(
     source = "test",
@@ -113,6 +118,7 @@ test_pred_measure <- function(
     predperf = predperf,
     fold_id = NULL,
     group_ids = group_ids,
+    model_name = model_name,
     psis_object = NULL,
     save_psis = FALSE
   )
