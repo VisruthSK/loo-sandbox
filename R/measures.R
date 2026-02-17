@@ -82,7 +82,7 @@
     measure,
     "elpd" = "elpd",
     "logscore" = "logscore",
-    "mlpd" = "mpld",
+    "mlpd" = "mlpd",
     "mae" = "mae",
     "r2" = "r2",
     "rmse" = "rmse",

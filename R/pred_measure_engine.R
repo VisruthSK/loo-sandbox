@@ -17,252 +17,6 @@
   )
 }
 
-.infer_measure_dims <- function(
-  ypred,
-  ylp,
-  mupred,
-  fallback_log_weights = NULL
-) {
-  if (!is.null(ypred) && !is.null(dim(ypred))) {
-    return(c(nrow(ypred), ncol(ypred)))
-  }
-  if (!is.null(ylp) && !is.null(dim(ylp))) {
-    return(c(nrow(ylp), ncol(ylp)))
-  }
-  if (!is.null(mupred) && !is.null(dim(mupred))) {
-    return(c(nrow(mupred), ncol(mupred)))
-  }
-  if (!is.null(fallback_log_weights)) {
-    return(c(nrow(fallback_log_weights), ncol(fallback_log_weights)))
-  }
-  stop(
-    "Could not infer dimensions from inputs. Supply at least one matrix input."
-  )
-}
-
-.validate_measure_args <- function(
-  measure,
-  y,
-  ypred,
-  mupred,
-  ylp,
-  S,
-  n
-) {
-  if (
-    measure %in%
-      c(
-        "mae",
-        "mse",
-        "rmse",
-        "r2",
-        "acc",
-        "balanced_acc"
-      )
-  ) {
-    checkmate::assert_vector(y, len = n, any.missing = FALSE)
-    checkmate::assert_matrix(mupred, nrows = S, ncols = n)
-    return(list(y = y, mupred = mupred))
-  }
-
-  if (
-    measure %in%
-      c(
-        "rps",
-        "crps",
-        "srps",
-        "scrps"
-      )
-  ) {
-    checkmate::assert_vector(y, len = n, any.missing = FALSE)
-    checkmate::assert_matrix(ypred, nrows = S, ncols = n)
-    return(list(y = y, ypred = ypred))
-  }
-
-  if (
-    measure %in%
-      c(
-        "elpd",
-        "logscore",
-        "mlpd"
-      )
-  ) {
-    checkmate::assert_matrix(ylp, nrows = S, ncols = n)
-    return(list(ylp = ylp))
-  }
-
-  stop("Unsupported measure: ", measure)
-}
-
-.resolve_loo_log_weights <- function(loo, psis_object, ylp, S, n) {
-  log_weights <- loo$log_weights
-  psis_loo <- loo$psis_object
-  has_psis_arg <- !missing(psis_object) && !is.null(psis_object)
-  has_loo_psis <- !is.null(psis_loo)
-  psis_used <- NULL
-
-  if (has_psis_arg && has_loo_psis) {
-    warning(
-      "Passing both PSIS and loo objects is not advised--defaulting to getting log-weights from loo object."
-    )
-    psis_used <- psis_loo
-  } else if (has_loo_psis) {
-    if (!is.psis(psis_loo)) {
-      stop(
-        "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
-      )
-    }
-    psis_used <- psis_loo
-  } else if (has_psis_arg) {
-    if (!is.psis(psis_object)) {
-      stop("Provided `psis_object` is not a valid `psis` object.")
-    }
-    psis_used <- psis_object
-  } else if (is.null(log_weights)) {
-    if (is.null(ylp)) {
-      stop(
-        "No possible way to obtain log-weights. Pass psis object, loo object with the argument `save_psis = TRUE`, or ylp."
-      )
-    }
-    # `loo::loo()` computes PSIS from negative log-likelihood ratios.
-    psis_used <- psis(-ylp)
-  }
-
-  if (is.null(log_weights)) {
-    log_weights <- weights(psis_used)
-  }
-  checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
-
-  list(log_weights = log_weights, psis_used = psis_used)
-}
-
-.build_base_measure <- function(
-  ylp,
-  log_weights_std,
-  include_p_eff = TRUE,
-  ylp_insample = NULL
-) {
-  base_elpd <- .elpd_summary(ylp, log_weights_std)
-  ic_pointwise <- -2 * base_elpd$pointwise
-  ic <- list(
-    estimate = sum(ic_pointwise),
-    se = ncol(ylp) * .se_helper(ic_pointwise, mean(ic_pointwise), ncol(ylp)),
-    pointwise = ic_pointwise
-  )
-
-  estimates <- rbind(
-    elpd = c(base_elpd$estimate, base_elpd$se),
-    ic = c(ic$estimate, ic$se)
-  )
-  pointwise <- cbind(
-    elpd = base_elpd$pointwise,
-    ic = ic$pointwise
-  )
-
-  if (include_p_eff) {
-    lpd_input <- if (is.null(ylp_insample)) ylp else ylp_insample
-    checkmate::assert_matrix(lpd_input, ncols = ncol(ylp))
-    lpd_pointwise <- matrixStats::colLogSumExps(lpd_input) -
-      log(nrow(lpd_input))
-    p_eff_pointwise <- lpd_pointwise - base_elpd$pointwise
-    p_eff <- list(
-      estimate = sum(p_eff_pointwise),
-      se = ncol(ylp) *
-        .se_helper(p_eff_pointwise, mean(p_eff_pointwise), ncol(ylp)),
-      pointwise = p_eff_pointwise
-    )
-    estimates <- rbind(
-      elpd = c(base_elpd$estimate, base_elpd$se),
-      p_eff = c(p_eff$estimate, p_eff$se),
-      ic = c(ic$estimate, ic$se)
-    )
-    pointwise <- cbind(
-      elpd = base_elpd$pointwise,
-      p_eff = p_eff$pointwise,
-      ic = ic$pointwise
-    )
-  }
-
-  colnames(estimates) <- c("Estimate", "SE")
-  list(estimates = estimates, pointwise = pointwise)
-}
-
-.merge_estimate_row <- function(estimates, row_name, estimate, se) {
-  if (is.null(estimates)) {
-    return(
-      matrix(
-        c(estimate, se),
-        nrow = 1,
-        dimnames = list(row_name, c("Estimate", "SE"))
-      )
-    )
-  }
-
-  if (row_name %in% rownames(estimates)) {
-    estimates[row_name, ] <- c(estimate, se)
-    return(estimates)
-  }
-
-  new_row <- matrix(
-    c(estimate, se),
-    nrow = 1,
-    dimnames = list(row_name, colnames(estimates))
-  )
-  rbind(estimates, new_row)
-}
-
-.merge_pointwise_col <- function(pointwise, col_name, values) {
-  if (is.null(pointwise)) {
-    return(matrix(values, ncol = 1, dimnames = list(NULL, col_name)))
-  }
-  if (col_name %in% colnames(pointwise)) {
-    pointwise[, col_name] <- values
-    return(pointwise)
-  }
-  cbind(pointwise, matrix(values, ncol = 1, dimnames = list(NULL, col_name)))
-}
-
-.coerce_nonloo_matrix_input <- function(x) {
-  if (is.null(x) || !is.null(dim(x))) {
-    return(x)
-  }
-  if (!is.atomic(x)) {
-    return(x)
-  }
-  matrix(x, nrow = 1)
-}
-
-.assert_predperf_compatibility <- function(source, predperf) {
-  if (is.null(predperf)) {
-    return(invisible(NULL))
-  }
-
-  if (source == "loo") {
-    if (!inherits(predperf, "loo") && !inherits(predperf, "loo_pred_measure")) {
-      stop("`loo` must be a `loo` object.")
-    }
-    return(invisible(NULL))
-  }
-
-  if (inherits(predperf, "loo")) {
-    stop("`predperf` cannot be a `loo` object for non-LOO predictive measures.")
-  }
-  if (!inherits(predperf, "pred_measure")) {
-    stop("`predperf` must be a prediction measure object.")
-  }
-
-  expected_class <- switch(
-    source,
-    insample = "insample_pred_measure",
-    kfold = "kfold_pred_measure",
-    test = "test_pred_measure"
-  )
-  if (!inherits(predperf, expected_class)) {
-    stop("`predperf` must inherit from `", expected_class, "`.")
-  }
-  invisible(NULL)
-}
-
 .pred_measure_engine <- function(
   source = c("loo", "insample", "kfold", "test"),
   y = NULL,
@@ -442,4 +196,252 @@
     ),
     dims = dim(log_weights)
   )
+}
+
+
+.infer_measure_dims <- function(
+  ypred,
+  ylp,
+  mupred,
+  fallback_log_weights = NULL
+) {
+  if (!is.null(ypred) && !is.null(dim(ypred))) {
+    return(c(nrow(ypred), ncol(ypred)))
+  }
+  if (!is.null(ylp) && !is.null(dim(ylp))) {
+    return(c(nrow(ylp), ncol(ylp)))
+  }
+  if (!is.null(mupred) && !is.null(dim(mupred))) {
+    return(c(nrow(mupred), ncol(mupred)))
+  }
+  if (!is.null(fallback_log_weights)) {
+    return(c(nrow(fallback_log_weights), ncol(fallback_log_weights)))
+  }
+  stop(
+    "Could not infer dimensions from inputs. Supply at least one matrix input."
+  )
+}
+
+.validate_measure_args <- function(
+  measure,
+  y,
+  ypred,
+  mupred,
+  ylp,
+  S,
+  n
+) {
+  if (
+    measure %in%
+      c(
+        "mae",
+        "mse",
+        "rmse",
+        "r2",
+        "acc",
+        "balanced_acc"
+      )
+  ) {
+    checkmate::assert_vector(y, len = n, any.missing = FALSE)
+    checkmate::assert_matrix(mupred, nrows = S, ncols = n)
+    return(list(y = y, mupred = mupred))
+  }
+
+  if (
+    measure %in%
+      c(
+        "rps",
+        "crps",
+        "srps",
+        "scrps"
+      )
+  ) {
+    checkmate::assert_vector(y, len = n, any.missing = FALSE)
+    checkmate::assert_matrix(ypred, nrows = S, ncols = n)
+    return(list(y = y, ypred = ypred))
+  }
+
+  if (
+    measure %in%
+      c(
+        "elpd",
+        "logscore",
+        "mlpd"
+      )
+  ) {
+    checkmate::assert_matrix(ylp, nrows = S, ncols = n)
+    return(list(ylp = ylp))
+  }
+
+  stop("Unsupported measure: ", measure)
+}
+
+.resolve_loo_log_weights <- function(loo, psis_object, ylp, S, n) {
+  log_weights <- loo$log_weights
+  psis_loo <- loo$psis_object
+  has_psis_arg <- !missing(psis_object) && !is.null(psis_object)
+  has_loo_psis <- !is.null(psis_loo)
+  psis_used <- NULL
+
+  if (has_psis_arg && has_loo_psis) {
+    warning(
+      "Passing both PSIS and loo objects is not advised--defaulting to getting log-weights from loo object."
+    )
+    psis_used <- psis_loo
+  } else if (has_loo_psis) {
+    if (!is.psis(psis_loo)) {
+      stop(
+        "No valid `psis` object found in provided `loo` object. Make sure you rerun `loo()` with the argument `save_psis = TRUE`.\nIf you want to use equal weighting, call `pred_measure()` instead."
+      )
+    }
+    psis_used <- psis_loo
+  } else if (has_psis_arg) {
+    if (!is.psis(psis_object)) {
+      stop("Provided `psis_object` is not a valid `psis` object.")
+    }
+    psis_used <- psis_object
+  } else if (is.null(log_weights)) {
+    if (is.null(ylp)) {
+      stop(
+        "No possible way to obtain log-weights. Pass psis object, loo object with the argument `save_psis = TRUE`, or ylp."
+      )
+    }
+    psis_used <- psis(-ylp)
+  }
+
+  if (is.null(log_weights)) {
+    log_weights <- weights(psis_used)
+  }
+  checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
+
+  list(log_weights = log_weights, psis_used = psis_used)
+}
+
+.build_base_measure <- function(
+  ylp,
+  log_weights_std,
+  include_p_eff = TRUE,
+  ylp_insample = NULL
+) {
+  base_elpd <- .elpd_summary(ylp, log_weights_std)
+  # TODO: do we want to keep this?
+  ic_pointwise <- -2 * base_elpd$pointwise
+  ic <- list(
+    estimate = sum(ic_pointwise),
+    se = ncol(ylp) * .se_helper(ic_pointwise, mean(ic_pointwise), ncol(ylp)),
+    pointwise = ic_pointwise
+  )
+
+  estimates <- rbind(
+    elpd = c(base_elpd$estimate, base_elpd$se),
+    ic = c(ic$estimate, ic$se)
+  )
+  pointwise <- cbind(
+    elpd = base_elpd$pointwise,
+    ic = ic$pointwise
+  )
+
+  if (include_p_eff) {
+    lpd_input <- if (is.null(ylp_insample)) ylp else ylp_insample
+    checkmate::assert_matrix(lpd_input, ncols = ncol(ylp))
+    lpd_pointwise <- matrixStats::colLogSumExps(lpd_input) -
+      log(nrow(lpd_input))
+    p_eff_pointwise <- lpd_pointwise - base_elpd$pointwise
+    p_eff <- list(
+      estimate = sum(p_eff_pointwise),
+      se = ncol(ylp) *
+        .se_helper(p_eff_pointwise, mean(p_eff_pointwise), ncol(ylp)),
+      pointwise = p_eff_pointwise
+    )
+    estimates <- rbind(
+      elpd = c(base_elpd$estimate, base_elpd$se),
+      p_eff = c(p_eff$estimate, p_eff$se),
+      ic = c(ic$estimate, ic$se)
+    )
+    pointwise <- cbind(
+      elpd = base_elpd$pointwise,
+      p_eff = p_eff$pointwise,
+      ic = ic$pointwise
+    )
+  }
+
+  colnames(estimates) <- c("Estimate", "SE")
+  list(estimates = estimates, pointwise = pointwise)
+}
+
+.merge_estimate_row <- function(estimates, row_name, estimate, se) {
+  if (is.null(estimates)) {
+    return(
+      matrix(
+        c(estimate, se),
+        nrow = 1,
+        dimnames = list(row_name, c("Estimate", "SE"))
+      )
+    )
+  }
+
+  # TODO: Should always update? error? warn? message?
+  if (row_name %in% rownames(estimates)) {
+    estimates[row_name, ] <- c(estimate, se)
+    return(estimates)
+  }
+
+  new_row <- matrix(
+    c(estimate, se),
+    nrow = 1,
+    dimnames = list(row_name, colnames(estimates))
+  )
+  rbind(estimates, new_row)
+}
+
+.merge_pointwise_col <- function(pointwise, col_name, values) {
+  if (is.null(pointwise)) {
+    return(matrix(values, ncol = 1, dimnames = list(NULL, col_name)))
+  }
+  if (col_name %in% colnames(pointwise)) {
+    pointwise[, col_name] <- values
+    return(pointwise)
+  }
+  cbind(pointwise, matrix(values, ncol = 1, dimnames = list(NULL, col_name)))
+}
+
+.coerce_nonloo_matrix_input <- function(x) {
+  if (is.null(x) || !is.null(dim(x))) {
+    return(x)
+  }
+  if (!is.atomic(x)) {
+    return(x)
+  }
+  matrix(x, nrow = 1)
+}
+
+.assert_predperf_compatibility <- function(source, predperf) {
+  if (is.null(predperf)) {
+    return(invisible(NULL))
+  }
+
+  if (source == "loo") {
+    if (!inherits(predperf, "loo") && !inherits(predperf, "loo_pred_measure")) {
+      stop("`loo` must be a `loo` object.")
+    }
+    return(invisible(NULL))
+  }
+
+  if (inherits(predperf, "loo")) {
+    stop("`predperf` cannot be a `loo` object for non-LOO predictive measures.")
+  }
+  if (!inherits(predperf, "pred_measure")) {
+    stop("`predperf` must be a prediction measure object.")
+  }
+
+  expected_class <- switch(
+    source,
+    insample = "insample_pred_measure",
+    kfold = "kfold_pred_measure",
+    test = "test_pred_measure"
+  )
+  if (!inherits(predperf, expected_class)) {
+    stop("`predperf` must inherit from `", expected_class, "`.")
+  }
+  invisible(NULL)
 }
