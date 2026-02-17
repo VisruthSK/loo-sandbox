@@ -252,6 +252,17 @@ test_that("non-LOO paths accept vector mupred and ylp", {
   expect_equal(test_vec_score$estimates, test_mat_score$estimates)
   expect_equal(test_vec_score$pointwise, test_mat_score$pointwise)
 
+  test_vec_mlpd <- test_pred_measure(
+    ylp = ylp_vec,
+    measure = "mlpd"
+  )
+  test_mat_mlpd <- test_pred_measure(
+    ylp = ylp_mat,
+    measure = "mlpd"
+  )
+  expect_equal(test_vec_mlpd$estimates, test_mat_mlpd$estimates)
+  expect_equal(test_vec_mlpd$pointwise, test_mat_mlpd$pointwise)
+
   kfold_vec_score <- kfold_pred_measure(
     ylp = ylp_vec,
     measure = "elpd",

@@ -43,6 +43,7 @@ run_wrapper_test <- function(
           )
         },
         elpd = ,
+        mlpd = ,
         logscore = {
           expected <- loo_pred_measure(
             y = inputs$y,
@@ -106,7 +107,8 @@ run_wrapper_test("acc", acc)
 run_wrapper_test("balanced_acc", balanced_acc)
 
 run_wrapper_test("elpd", elpd)
-run_wrapper_test("logscore", logscore)
+run_wrapper_test("mlpd", mlpd)
+run_wrapper_test("logscore", elpd)
 
 run_wrapper_test("rps", rps)
 run_wrapper_test("crps", crps)

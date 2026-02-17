@@ -8,8 +8,8 @@
   switch(
     measure,
     "elpd" = .elpd_summary,
-    "logscore" = .logscore_summary,
-    "mlpd" = .logscore_summary,
+    "logscore" = .elpd_summary,
+    "mlpd" = .mlpd_summary,
     "mae" = .mae_summary,
     "r2" = .r2_summary,
     "rmse" = .rmse_summary,
@@ -65,6 +65,7 @@
     "mse" = "squared_error",
     "acc" = "accuracy",
     "balanced_acc" = "accuracy",
+    # TODO: check if these pointwise values are actually disparate
     "rps" = "rps",
     "crps" = "crps",
     "srps" = "srps",
@@ -81,7 +82,7 @@
   switch(
     measure,
     "elpd" = "elpd",
-    "logscore" = "logscore",
+    "logscore" = "elpd",
     "mlpd" = "mlpd",
     "mae" = "mae",
     "r2" = "r2",
@@ -174,13 +175,12 @@ NULL
   )
 }
 
-#' Log score
+#' Mean log-predictive density
 #'
 #' @noRd
 #' @inheritParams summary_measure_params
 #' @inheritSection summary_measure_params Assumptions
-.logscore_summary <- function(ylp, log_weights, pointwise = NULL) {
-  # TODO: this should be sum
+.mlpd_summary <- function(ylp, log_weights, pointwise = NULL) {
   n <- ncol(ylp)
   l <- .elpd_summary(ylp, log_weights, pointwise)
   # tranformation of elpd estimates, same pointwise values
@@ -190,8 +190,6 @@ NULL
     pointwise = l$pointwise
   )
 }
-
-# TODO: current logscore should actually be called mlpd
 
 #' Pointwise CRPS
 #'
@@ -268,45 +266,6 @@ NULL
     log_weights = log_weights,
     scaled = TRUE,
     pointwise = pointwise
-  )
-}
-
-# ----------------------------- Helpers -----------------------------
-
-#' Weighted Mean
-#'
-#' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
-#'
-#' @noRd
-.loo_weighted_mean <- function(x, log_weights) {
-  sum(x * exp(log_weights - matrixStats::logSumExp(log_weights)))
-}
-
-.se_helper <- function(x, xbar, n) {
-  sqrt(sum((x - xbar)^2) / (n * (n - 1)))
-}
-
-#' Simple Summary
-#'
-#' Function to get common estimate and associated SE.
-#'
-#' @noRd
-.simple_pointwise_summary <- function(pointwise) {
-  est <- mean(pointwise)
-  list(
-    estimate = est,
-    se = .se_helper(pointwise, est, length(pointwise)),
-    pointwise = pointwise
-  )
-}
-
-.standardize_log_weights <- function(log_weights) {
-  sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights),
-    FUN = "-",
-    check.margin = FALSE
   )
 }
 
@@ -534,5 +493,44 @@ NULL
     pointwise *
       n /
       (length(cls_counts) * as.numeric(cls_counts[match(y, names(cls_counts))]))
+  )
+}
+
+# ----------------------------- Helpers -----------------------------
+
+#' Weighted Mean
+#'
+#' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
+#'
+#' @noRd
+.loo_weighted_mean <- function(x, log_weights) {
+  sum(x * exp(log_weights - matrixStats::logSumExp(log_weights)))
+}
+
+.se_helper <- function(x, xbar, n) {
+  sqrt(sum((x - xbar)^2) / (n * (n - 1)))
+}
+
+#' Simple Summary
+#'
+#' Function to get common estimate and associated SE.
+#'
+#' @noRd
+.simple_pointwise_summary <- function(pointwise) {
+  est <- mean(pointwise)
+  list(
+    estimate = est,
+    se = .se_helper(pointwise, est, length(pointwise)),
+    pointwise = pointwise
+  )
+}
+
+.standardize_log_weights <- function(log_weights) {
+  sweep(
+    log_weights,
+    2,
+    matrixStats::colLogSumExps(log_weights),
+    FUN = "-",
+    check.margin = FALSE
   )
 }

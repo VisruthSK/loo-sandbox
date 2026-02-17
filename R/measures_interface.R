@@ -140,12 +140,12 @@ elpd <- function(ylp, log_weights) {
   .elpd_summary(ylp = ylp, log_weights = log_weights, pointwise = NULL)
 }
 
-#' Log score
+#' Mean log-predictive density
 #'
 #' @inheritParams summary_measure_params
 #'
 #' @export
-logscore <- function(ylp, log_weights) {
+mlpd <- function(ylp, log_weights) {
   n <- ncol(ylp)
   S <- nrow(ylp)
   checkmate::assert_matrix(ylp, ncols = n)
@@ -153,7 +153,7 @@ logscore <- function(ylp, log_weights) {
 
   log_weights <- .standardize_log_weights(log_weights)
 
-  .logscore_summary(ylp = ylp, log_weights = log_weights, pointwise = NULL)
+  .mlpd_summary(ylp = ylp, log_weights = log_weights, pointwise = NULL)
 }
 
 #' (Continuous) Ranked Probability Score

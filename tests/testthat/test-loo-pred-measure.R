@@ -56,8 +56,13 @@ test_that("loo_pred_measure rejects non-loo pred_measure objects", {
   )
 })
 
-test_that("loo_pred_measure keeps mlpd alias behavior", {
+test_that("loo_pred_measure keeps mlpd distinct and aliases logscore to elpd", {
   inputs <- roaches_models$model1
+  result_elpd <- loo_pred_measure(
+    ylp = inputs$ylp,
+    loo = inputs$loo,
+    measure = "elpd"
+  )
   result_mlpd <- loo_pred_measure(
     ylp = inputs$ylp,
     loo = inputs$loo,
@@ -71,15 +76,34 @@ test_that("loo_pred_measure keeps mlpd alias behavior", {
 
   mlpd_row <- .match_results_column("mlpd")
   mlpd_col <- .match_pointwise_column("mlpd")
+  logscore_row <- .match_results_column("logscore")
+  logscore_col <- .match_pointwise_column("logscore")
   expect_true(mlpd_row %in% rownames(result_mlpd$estimates))
   expect_true(mlpd_col %in% colnames(result_mlpd$pointwise))
+  expect_false("logscore" %in% rownames(result_logscore$estimates))
+  expect_true(logscore_row %in% rownames(result_logscore$estimates))
+  expect_true(logscore_col %in% colnames(result_logscore$pointwise))
+  expect_equal(
+    result_logscore$estimates[logscore_row, "Estimate"],
+    result_elpd$estimates["elpd", "Estimate"]
+  )
+  expect_equal(
+    result_logscore$estimates[logscore_row, "SE"],
+    result_elpd$estimates["elpd", "SE"]
+  )
+  expect_equal(
+    result_logscore$pointwise[, logscore_col],
+    result_elpd$pointwise[, "elpd"]
+  )
   expect_equal(
     result_mlpd$estimates[mlpd_row, "Estimate"],
-    result_logscore$estimates["logscore", "Estimate"]
+    result_elpd$estimates["elpd", "Estimate"] /
+      length(result_mlpd$pointwise[, mlpd_col])
   )
   expect_equal(
     result_mlpd$estimates[mlpd_row, "SE"],
-    result_logscore$estimates["logscore", "SE"]
+    result_elpd$estimates["elpd", "SE"] /
+      length(result_mlpd$pointwise[, mlpd_col])
   )
 })
 

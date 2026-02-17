@@ -17,6 +17,7 @@ measure_specs <- function(temp) {
     list(measure = "srps", args = list(y = temp$y, ypred = temp$ypred)),
     list(measure = "scrps", args = list(y = temp$y, ypred = temp$ypred)),
     list(measure = "elpd", args = list(ylp = temp$ylp)),
+    list(measure = "mlpd", args = list(ylp = temp$ylp)),
     list(measure = "logscore", args = list(ylp = temp$ylp))
   )
 }
