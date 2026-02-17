@@ -21,7 +21,7 @@ reference:
   - acc
   - balanced_acc
   - elpd
-  - logscore
+  - mlpd
   - mae
   - mse
   - r2
