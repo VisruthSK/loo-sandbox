@@ -21,8 +21,8 @@ Core functions for computing LOO predictive measures
   : Balanced classification accuracy
 - [`elpd()`](https://visruthsk.github.io/loo-sandbox/reference/elpd.md)
   : Expected log-predictive density
-- [`logscore()`](https://visruthsk.github.io/loo-sandbox/reference/logscore.md)
-  : Log score
+- [`mlpd()`](https://visruthsk.github.io/loo-sandbox/reference/mlpd.md)
+  : Mean log-predictive density
 - [`mae()`](https://visruthsk.github.io/loo-sandbox/reference/mae.md) :
   Mean absolute error
 - [`mse()`](https://visruthsk.github.io/loo-sandbox/reference/mse.md) :
