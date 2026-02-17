@@ -198,7 +198,6 @@
   )
 }
 
-
 .infer_measure_dims <- function(
   ypred,
   ylp,

@@ -9,10 +9,10 @@ Description: Simple, temporary package to test new measure implementation
 License: MIT + file LICENSE
 URL: https://visruthsk.github.io/loo-sandbox/
 Depends: 
+    loo,
     R (>= 3.5.0)
 Imports:
     checkmate,
-    loo,
     matrixStats,
     stats,
     utils
