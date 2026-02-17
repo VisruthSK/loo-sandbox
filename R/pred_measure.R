@@ -129,6 +129,7 @@ test_pred_measure <- function(
 
 #' @export
 print.pred_measure <- function(x, digits = 1, ...) {
+  # TODO: ppl should be able to choose what is printed
   dims <- attr(x, "dims")
   if (is.null(dims) && !is.null(x$log_weights)) {
     dims <- dim(x$log_weights)
@@ -154,22 +155,12 @@ print.pred_measure <- function(x, digits = 1, ...) {
 }
 
 #' @export
-print.insample_pred_measure <- function(x, digits = 1, ...) {
-  print.pred_measure(x, digits = digits, ...)
-}
-
-#' @export
 print.kfold_pred_measure <- function(x, digits = 1, ...) {
   print.pred_measure(x, digits = digits, ...)
   if (!is.null(x$metadata$fold_id)) {
     cat(sprintf("Folds: %s\n", length(unique(x$metadata$fold_id))))
   }
   invisible(x)
-}
-
-#' @export
-print.test_pred_measure <- function(x, digits = 1, ...) {
-  print.pred_measure(x, digits = digits, ...)
 }
 
 .pred_measure_source_label <- function(x) {

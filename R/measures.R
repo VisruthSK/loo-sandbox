@@ -180,6 +180,7 @@ NULL
 #' @inheritParams summary_measure_params
 #' @inheritSection summary_measure_params Assumptions
 .logscore_summary <- function(ylp, log_weights, pointwise = NULL) {
+  # TODO: this should be sum
   n <- ncol(ylp)
   l <- .elpd_summary(ylp, log_weights, pointwise)
   # tranformation of elpd estimates, same pointwise values
@@ -189,6 +190,8 @@ NULL
     pointwise = l$pointwise
   )
 }
+
+# TODO: current logscore should actually be called mlpd
 
 #' Pointwise CRPS
 #'

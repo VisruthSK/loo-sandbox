@@ -323,7 +323,7 @@
   ylp_insample = NULL
 ) {
   base_elpd <- .elpd_summary(ylp, log_weights_std)
-  # TODO: do we want to keep this?
+  # TODO: make a measure--use ELPD ptwise
   ic_pointwise <- -2 * base_elpd$pointwise
   ic <- list(
     estimate = sum(ic_pointwise),
@@ -385,12 +385,14 @@
     return(estimates)
   }
 
-  new_row <- matrix(
-    c(estimate, se),
-    nrow = 1,
-    dimnames = list(row_name, colnames(estimates))
+  rbind(
+    estimates,
+    matrix(
+      c(estimate, se),
+      nrow = 1,
+      dimnames = list(row_name, colnames(estimates))
+    )
   )
-  rbind(estimates, new_row)
 }
 
 .merge_pointwise_col <- function(pointwise, col_name, values) {
