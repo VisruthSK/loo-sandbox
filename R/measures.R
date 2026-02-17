@@ -200,16 +200,17 @@ NULL
 .pointwise_rps <- function(y, ypred, log_weights, scaled) {
   if (is.null(log_weights)) {
     EXy <- mean(abs(y - ypred))
-    y <- sort(y)
-    n <- length(y)
-    EXX <- -2 * mean(y - 2 * y * (0:(n - 1)) / (n - 1))
+    ypred <- sort(ypred)
+    n <- length(ypred)
+    EXX <- -2 * mean(ypred - 2 * ypred * (0:(n - 1)) / (n - 1))
   } else {
-    EXy <- sum(log_weights * abs(y - ypred))
-    ord <- order(y)
-    y <- y[ord]
-    log_weights <- log_weights[ord]
-    cw <- (cumsum(log_weights) - log_weights) / (1 - log_weights)
-    EXX <- -2 * sum(log_weights * (y - 2 * y * cw))
+    weights <- exp(log_weights - matrixStats::logSumExp(log_weights))
+    EXy <- sum(weights * abs(y - ypred))
+    ord <- order(ypred)
+    ypred <- ypred[ord]
+    weights <- weights[ord]
+    cw <- (cumsum(weights) - weights) / (1 - weights)
+    EXX <- -2 * sum(weights * (ypred - 2 * ypred * cw))
   }
 
   if (!scaled) {
@@ -489,11 +490,12 @@ NULL
     pointwise
   }
 
-  .simple_pointwise_summary(
-    pointwise *
-      n /
-      (length(cls_counts) * as.numeric(cls_counts[match(y, names(cls_counts))]))
-  )
+  (pointwise *
+    n /
+    (length(cls_counts) *
+      as.numeric(cls_counts[match(y, names(cls_counts))]))) |>
+    .simple_pointwise_summary() |>
+    modifyList(list(pointwise = pointwise))
 }
 
 # ----------------------------- Helpers -----------------------------

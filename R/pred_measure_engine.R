@@ -47,7 +47,13 @@
     ylp_insample <- .coerce_nonloo_matrix_input(ylp_insample)
   }
 
-  dims <- .infer_measure_dims(ypred, ylp, mupred, predperf$log_weights)
+  dims <- .infer_measure_dims(
+    ypred = ypred,
+    ylp = ylp,
+    mupred = mupred,
+    fallback_log_weights = predperf$log_weights,
+    fallback_predperf = predperf
+  )
   S <- dims[1]
   n <- dims[2]
 
@@ -84,7 +90,7 @@
   existing_pointwise <- if (!is.null(predperf)) predperf$pointwise else NULL
 
   use_existing_elpd <- source == "loo" &&
-    measure == "elpd" &&
+    measure %in% c("elpd", "logscore") &&
     !is.null(existing_estimates) &&
     !is.null(existing_pointwise) &&
     results_col %in% rownames(existing_estimates) &&
@@ -202,7 +208,8 @@
   ypred,
   ylp,
   mupred,
-  fallback_log_weights = NULL
+  fallback_log_weights = NULL,
+  fallback_predperf = NULL
 ) {
   if (!is.null(ypred) && !is.null(dim(ypred))) {
     return(c(nrow(ypred), ncol(ypred)))
@@ -215,6 +222,13 @@
   }
   if (!is.null(fallback_log_weights)) {
     return(c(nrow(fallback_log_weights), ncol(fallback_log_weights)))
+  }
+  if (
+    !is.null(fallback_predperf) &&
+      !is.null(fallback_predperf$psis_object) &&
+      !is.null(attr(fallback_predperf$psis_object, "dims"))
+  ) {
+    return(attr(fallback_predperf$psis_object, "dims"))
   }
   stop(
     "Could not infer dimensions from inputs. Supply at least one matrix input."
@@ -309,7 +323,7 @@
   }
 
   if (is.null(log_weights)) {
-    log_weights <- weights(psis_used)
+    log_weights <- weights(psis_used, normalize = TRUE, log = TRUE)
   }
   checkmate::assert_matrix(log_weights, nrows = S, ncols = n)
 

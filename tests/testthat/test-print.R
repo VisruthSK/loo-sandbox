@@ -25,12 +25,31 @@ measure_specs <- function(temp) {
 run_measure_snapshots <- function(loo_start, measures) {
   loo_iter <- loo_start
   for (measure in measures) {
+    loo_prev <- loo_iter
     loo_iter <- do.call(
       loo_pred_measure,
       c(
         measure$args,
         list(measure = measure$measure, loo = loo_iter)
       )
+    )
+    common_rows <- intersect(
+      rownames(loo_prev$estimates),
+      rownames(loo_iter$estimates)
+    )
+    common_cols <- intersect(
+      colnames(loo_prev$pointwise),
+      colnames(loo_iter$pointwise)
+    )
+    expect_equal(
+      loo_iter$estimates[common_rows, , drop = FALSE],
+      loo_prev$estimates[common_rows, , drop = FALSE],
+      info = measure$measure
+    )
+    expect_equal(
+      loo_iter$pointwise[, common_cols, drop = FALSE],
+      loo_prev$pointwise[, common_cols, drop = FALSE],
+      info = measure$measure
     )
     expect_snapshot_output(print(loo_iter))
   }

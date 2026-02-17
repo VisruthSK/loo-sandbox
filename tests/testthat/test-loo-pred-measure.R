@@ -38,6 +38,20 @@ test_that("loo_pred_measure aligns with loo summaries", {
   )
 })
 
+test_that("loo_pred_measure logscore alias uses loo elpd summaries", {
+  inputs <- roaches_models$model1
+  result <- loo_pred_measure(
+    loo = inputs$loo,
+    measure = "logscore"
+  )
+  expect_false("logscore" %in% rownames(result$estimates))
+  expect_equal(
+    result$estimates["elpd", , drop = FALSE],
+    inputs$loo$estimates["elpd", , drop = FALSE]
+  )
+  expect_equal(result$pointwise[, "elpd"], inputs$loo$pointwise[, "elpd"])
+})
+
 test_that("loo_pred_measure rejects non-loo pred_measure objects", {
   inputs <- roaches_models$model1
   nonloo <- insample_pred_measure(
@@ -53,6 +67,83 @@ test_that("loo_pred_measure rejects non-loo pred_measure objects", {
       measure = "elpd"
     ),
     "`loo` must be a `loo` object"
+  )
+})
+
+test_that("loo_pred_measure computes finite SRPS and keeps score aliases", {
+  inputs <- roaches_models$model1
+  result_rps <- loo_pred_measure(
+    y = inputs$y,
+    ypred = inputs$ypred,
+    loo = inputs$loo,
+    measure = "rps"
+  )
+  result_crps <- loo_pred_measure(
+    y = inputs$y,
+    ypred = inputs$ypred,
+    loo = inputs$loo,
+    measure = "crps"
+  )
+  result_srps <- loo_pred_measure(
+    y = inputs$y,
+    ypred = inputs$ypred,
+    loo = inputs$loo,
+    measure = "srps"
+  )
+  result_scrps <- loo_pred_measure(
+    y = inputs$y,
+    ypred = inputs$ypred,
+    loo = inputs$loo,
+    measure = "scrps"
+  )
+
+  pointwise_rps_ref <- vapply(
+    seq_along(inputs$y),
+    function(i) {
+      log_weights <- result_rps$log_weights[, i]
+      w <- exp(log_weights - matrixStats::logSumExp(log_weights))
+      ypred <- inputs$ypred[, i]
+      exy <- sum(w * abs(inputs$y[i] - ypred))
+      ord <- order(ypred)
+      ypred <- ypred[ord]
+      w <- w[ord]
+      cw <- (cumsum(w) - w) / (1 - w)
+      exx <- -2 * sum(w * (ypred - 2 * ypred * cw))
+      -exy + 0.5 * exx
+    },
+    numeric(1)
+  )
+  pointwise_srps_ref <- vapply(
+    seq_along(inputs$y),
+    function(i) {
+      log_weights <- result_rps$log_weights[, i]
+      w <- exp(log_weights - matrixStats::logSumExp(log_weights))
+      ypred <- inputs$ypred[, i]
+      exy <- sum(w * abs(inputs$y[i] - ypred))
+      ord <- order(ypred)
+      ypred <- ypred[ord]
+      w <- w[ord]
+      cw <- (cumsum(w) - w) / (1 - w)
+      exx <- -2 * sum(w * (ypred - 2 * ypred * cw))
+      -exy / exx - 0.5 * log(exx)
+    },
+    numeric(1)
+  )
+
+  expect_true(all(is.finite(result_srps$pointwise[, "srps"])))
+  expect_true(is.finite(result_srps$estimates["srps", "Estimate"]))
+  expect_true(is.finite(result_srps$estimates["srps", "SE"]))
+  expect_equal(result_rps$pointwise[, "rps"], pointwise_rps_ref)
+  expect_equal(result_srps$pointwise[, "srps"], pointwise_srps_ref)
+  expect_equal(result_rps$pointwise[, "rps"], result_crps$pointwise[, "crps"])
+  expect_equal(result_rps$estimates["rps", ], result_crps$estimates["crps", ])
+  expect_equal(
+    result_srps$pointwise[, "srps"],
+    result_scrps$pointwise[, "scrps"]
+  )
+  expect_equal(
+    result_srps$estimates["srps", ],
+    result_scrps$estimates["scrps", ]
   )
 })
 
