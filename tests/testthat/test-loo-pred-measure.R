@@ -44,7 +44,7 @@ test_that("loo_pred_measure logscore alias uses loo elpd summaries", {
     loo = inputs$loo,
     measure = "logscore"
   )
-  expect_false("logscore" %in% rownames(result$estimates))
+  expect_true("logscore" %in% rownames(result$estimates))
   expect_equal(
     result$estimates["elpd", , drop = FALSE],
     inputs$loo$estimates["elpd", , drop = FALSE]
@@ -66,7 +66,7 @@ test_that("loo_pred_measure rejects non-loo pred_measure objects", {
       loo = nonloo,
       measure = "elpd"
     ),
-    "`loo` must be a `loo` object"
+    "Must inherit from class 'loo'/'loo_pred_measure'"
   )
 })
 
@@ -171,7 +171,7 @@ test_that("loo_pred_measure keeps mlpd distinct and aliases logscore to elpd", {
   logscore_col <- .match_pointwise_column("logscore")
   expect_true(mlpd_row %in% rownames(result_mlpd$estimates))
   expect_true(mlpd_col %in% colnames(result_mlpd$pointwise))
-  expect_false("logscore" %in% rownames(result_logscore$estimates))
+  expect_true("logscore" %in% rownames(result_logscore$estimates))
   expect_true(logscore_row %in% rownames(result_logscore$estimates))
   expect_true(logscore_col %in% colnames(result_logscore$pointwise))
   expect_equal(
@@ -235,5 +235,41 @@ test_that("loo_pred_measure fallback PSIS path matches loo::loo", {
   expect_equal(
     result$estimates["elpd", "SE"],
     ref$estimates["elpd_loo", "SE"]
+  )
+})
+
+test_that("loo_pred_measure supports multiple measures", {
+  inputs <- roaches_models$model1
+
+  expect_no_error(
+    loo_pred_measure(
+      y = inputs$y,
+      mupred = inputs$mupred,
+      ylp = inputs$ylp,
+      psis_object = inputs$loo$psis_object,
+      measure = c("r2", "logscore", "mse")
+    )
+  )
+
+  expect_error(
+    loo_pred_measure(
+      y = inputs$y,
+      mupred = inputs$mupred,
+      ylp = inputs$ylp,
+      psis_object = inputs$loo$psis_object,
+      measure = c("r2", "logscore", "mse", "crps")
+    ),
+    regexp = "For crps, the `ypred` argument must be specified but is currently NULL."
+  )
+
+  expect_error(
+    loo_pred_measure(
+      y = inputs$y,
+      mupred = inputs$mupred,
+      ylp = inputs$ylp,
+      psis_object = inputs$loo$psis_object,
+      measure = c("r2", "logscore", "mse", "scrps")
+    ),
+    regexp = "For scrps, the `ypred` argument must be specified but is currently NULL."
   )
 })
