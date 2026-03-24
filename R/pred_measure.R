@@ -1,3 +1,7 @@
+# pred_measure.R: primary user-facing constructors for predictive
+# performance objects across data sources.
+
+
 #' Shared parameters for predictive measure wrappers
 #'
 #' @param y vector of observed values (n)
@@ -35,10 +39,12 @@ insample_pred_measure <- function(
   mupred = NULL,
   ylp = NULL,
   predperf = NULL,
-  measure = .pred_measure_choices(),
+  measure = "logscore",
   group_ids = NULL,
   model_name = NULL
 ) {
+  measure <- .validate_measure_names(measure, .pred_measure_choices)
+
   .pred_measure_engine(
     source = "insample",
     y = y,
@@ -71,10 +77,12 @@ kfold_pred_measure <- function(
   ylp_insample = NULL,
   fold_id = NULL,
   predperf = NULL,
-  measure = .pred_measure_choices(),
+  measure = "logscore",
   group_ids = NULL,
   model_name = NULL
 ) {
+  measure <- .validate_measure_names(measure, .pred_measure_choices)
+
   .pred_measure_engine(
     source = "kfold",
     y = y,
@@ -106,10 +114,12 @@ test_pred_measure <- function(
   ylp = NULL,
   ylp_insample = NULL,
   predperf = NULL,
-  measure = .pred_measure_choices(),
+  measure = "logscore",
   group_ids = NULL,
   model_name = NULL
 ) {
+  measure <- .validate_measure_names(measure, .pred_measure_choices)
+
   .pred_measure_engine(
     source = "test",
     y = y,
@@ -127,58 +137,42 @@ test_pred_measure <- function(
   )
 }
 
+# TODO: document function--look at loo #281
+#' LOO Predictive Measure
+#'
+#' @inheritParams pred_measure_params
+#'
+#' @return Placeholder
+#'
 #' @export
-print.pred_measure <- function(x, digits = 1, ...) {
-  # TODO: ppl should be able to choose what is printed
-  dims <- attr(x, "dims")
-  if (is.null(dims) && !is.null(x$log_weights)) {
-    dims <- dim(x$log_weights)
-  }
-  source <- .pred_measure_source_label(x)
+loo_pred_measure <- function(
+  y = NULL,
+  ypred = NULL,
+  mupred = NULL,
+  ylp = NULL,
+  measure = "logscore",
+  group_ids = NULL,
+  model_name = NULL,
+  loo = NULL, # This `loo` object needs to be fit with `save_psis = TRUE`
+  psis_object = NULL,
+  save_psis = FALSE
+) {
 
-  cat("\n")
-  if (!is.null(dims) && length(dims) == 2) {
-    cat(
-      sprintf(
-        "Computed from %s posterior draws and %s observations.\n",
-        dims[1],
-        dims[2]
-      )
-    )
-  }
-  cat(sprintf("Data source: %s\n\n", source))
-  print(
-    format(round(as.data.frame(x$estimates), digits), nsmall = digits),
-    quote = FALSE
+  measure <- .validate_measure_names(measure, .pred_measure_choices)
+
+  .pred_measure_engine(
+    source = "loo",
+    y = y,
+    ypred = ypred,
+    mupred = mupred,
+    ylp = ylp,
+    ylp_insample = NULL,
+    measure = measure,
+    predperf = loo,
+    fold_id = NULL,
+    group_ids = group_ids,
+    model_name = model_name,
+    psis_object = psis_object,
+    save_psis = save_psis
   )
-  invisible(x)
-}
-
-#' @export
-print.kfold_pred_measure <- function(x, digits = 1, ...) {
-  print.pred_measure(x, digits = digits, ...)
-  if (!is.null(x$metadata$fold_id)) {
-    cat(sprintf("Folds: %s\n", length(unique(x$metadata$fold_id))))
-  }
-  invisible(x)
-}
-
-.pred_measure_source_label <- function(x) {
-  cls <- class(x)
-  if ("loo_pred_measure" %in% cls) {
-    return("loo")
-  }
-  if ("insample_pred_measure" %in% cls) {
-    return("in-sample")
-  }
-  if ("kfold_pred_measure" %in% cls) {
-    return("k-fold")
-  }
-  if ("test_pred_measure" %in% cls) {
-    return("test")
-  }
-  if (!is.null(x$metadata$source)) {
-    return(as.character(x$metadata$source))
-  }
-  "unknown"
 }
