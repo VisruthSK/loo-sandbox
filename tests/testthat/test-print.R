@@ -1,3 +1,6 @@
+# TODO: Discussion item: I would not use snapshots for tables/lists. 
+# Its very prone to providing errors just because of differences in whitespace handling. 
+# But here its more about numeric accuracy I think.
 measure_specs <- function(temp) {
   list(
     list(measure = "r2", args = list(y = temp$y, mupred = temp$mupred)),

@@ -1,101 +1,10 @@
-#' Identify measure function function by `measure`
-#'
-#' @noRd
-#' @param measure The measure used.
-#' @return The function used to compute predictive error or accuracy specified
-#' by the argument `measure`.
-.loo_predictive_measure_fun <- function(measure) {
-  switch(
-    measure,
-    "elpd" = .elpd_summary,
-    "logscore" = .elpd_summary,
-    "mlpd" = .mlpd_summary,
-    "mae" = .mae_summary,
-    "r2" = .r2_summary,
-    "rmse" = .rmse_summary,
-    "mse" = .mse_summary,
-    "acc" = .accuracy_summary,
-    "balanced_acc" = .balanced_accuracy_summary,
-    "rps" = .rps_summary,
-    "crps" = .rps_summary,
-    "srps" = .srps_summary,
-    "scrps" = .srps_summary,
-    # , "energy" = .energy
-  )
-}
+# pred_measure_measures.R: internal pointwise and summary implementations
+# for all supported predictive scores and metrics.
 
-#' Identify pointwise function by `measure`
-#'
-#' @noRd
-#' @param measure The measure used.
-#' @return The function used to compute pointwise values by the argument `measure`.
-.match_pointwise_function <- function(measure) {
-  switch(
-    measure,
-    "elpd" = .pointwise_elpd,
-    "logscore" = .pointwise_elpd,
-    "mlpd" = .pointwise_elpd,
-    "mae" = .pointwise_squared_error,
-    "r2" = .pointwise_squared_error,
-    "rmse" = .pointwise_squared_error,
-    "mse" = .pointwise_squared_error,
-    "acc" = .pointwise_accuracy,
-    "balanced_acc" = .pointwise_accuracy,
-    "rps" = .pointwise_rps,
-    "crps" = .pointwise_rps,
-    "srps" = .pointwise_rps,
-    "scrps" = .pointwise_rps
-  )
-}
 
-#' Match measure to pointwise column name
-#'
-#' @noRd
-#' @param measure The measure used.
-#' @return The column name in the loo pointwise matrix for the given measure.
-.match_pointwise_column <- function(measure) {
-  switch(
-    measure,
-    "elpd" = "elpd",
-    "logscore" = "elpd",
-    "mlpd" = "elpd",
-    "mae" = "squared_error",
-    "r2" = "squared_error",
-    "rmse" = "squared_error",
-    "mse" = "squared_error",
-    "acc" = "accuracy",
-    "balanced_acc" = "accuracy",
-    # TODO: check if these pointwise values are actually disparate
-    "rps" = "rps",
-    "crps" = "crps",
-    "srps" = "srps",
-    "scrps" = "scrps"
-  )
-}
-
-#' Match measure to results column name
-#'
-#' @noRd
-#' @param measure The measure used.
-#' @return The column name in the loo results matrix for the given measure.
-.match_results_column <- function(measure) {
-  switch(
-    measure,
-    "elpd" = "elpd",
-    "logscore" = "elpd",
-    "mlpd" = "mlpd",
-    "mae" = "mae",
-    "r2" = "r2",
-    "rmse" = "rmse",
-    "mse" = "mse",
-    "acc" = "acc",
-    "balanced_acc" = "bal_acc",
-    "rps" = "rps",
-    "crps" = "crps",
-    "srps" = "srps",
-    "scrps" = "scrps"
-  )
-}
+# internal constant
+.pred_measure_choices <- c("logscore", "mlpd", "elpd", "r2", "rps", "crps",
+"srps", "scrps", "mae", "rmse", "mse", "acc", "balanced_acc") # "energy",
 
 #' Shared parameters for pointwise functions
 #'
@@ -106,7 +15,9 @@
 #' @param log_weights vector of standardized loo weights (S) on the log scale
 #'
 #' @section Assumptions:
-#' `log_weights` are on the log scale and standardized. `y` is a scalar and any relevant amongst `mupred`, `ypred`, `ylp`, and `log_weights` are vectors of length `S`.
+#' `log_weights` are on the log scale and standardized.
+#' `y` is a scalar and any relevant amongst `mupred`, `ypred`, `ylp`, and
+#' `log_weights` are vectors of length `S`.
 #'
 #' @keywords internal
 #' @name pointwise_measure_params
@@ -289,7 +200,7 @@ NULL
 .mae_summary <- function(y, mupred, log_weights, pointwise = NULL) {
   pointwise <- if (is.null(pointwise)) {
     vapply(
-      seq_len(length(y)),
+      seq_along(y),
       function(i) {
         .pointwise_squared_error(
           y[i],
@@ -319,7 +230,7 @@ NULL
 ) {
   pointwise <- if (is.null(pointwise)) {
     vapply(
-      seq_len(length(y)),
+      seq_along(y),
       function(i) {
         .pointwise_squared_error(
           y[i],
@@ -348,7 +259,7 @@ NULL
 ) {
   pointwise <- if (is.null(pointwise)) {
     vapply(
-      seq_len(length(y)),
+      seq_along(y),
       function(i) {
         .pointwise_squared_error(
           y[i],
@@ -442,7 +353,7 @@ NULL
   checkmate::assert_subset(mupred, choices = c(0, 1))
   pointwise <- if (is.null(pointwise)) {
     vapply(
-      seq_len(length(y)),
+      seq_along(y),
       function(i) {
         .pointwise_accuracy(
           y[i],
@@ -498,41 +409,88 @@ NULL
     modifyList(list(pointwise = pointwise))
 }
 
-# ----------------------------- Helpers -----------------------------
-
-#' Weighted Mean
-#'
-#' A wrapper around `stats::weighted.mean` which treats `NULL` weights as missing.
-#'
-#' @noRd
-.loo_weighted_mean <- function(x, log_weights) {
-  sum(x * exp(log_weights - matrixStats::logSumExp(log_weights)))
-}
-
-.se_helper <- function(x, xbar, n) {
-  sqrt(sum((x - xbar)^2) / (n * (n - 1)))
-}
-
-#' Simple Summary
-#'
-#' Function to get common estimate and associated SE.
-#'
-#' @noRd
-.simple_pointwise_summary <- function(pointwise) {
-  est <- mean(pointwise)
-  list(
-    estimate = est,
-    se = .se_helper(pointwise, est, length(pointwise)),
-    pointwise = pointwise
+# internal function to get the measure specification
+# @noRd
+# @param measure The measure used.
+# @return The measure specification.
+.measure_spec <- list(
+  elpd = list(
+    fun = .pointwise_elpd,
+    summary_fun = .elpd_summary,
+    pointwise_col = "elpd",
+    results_col = "elpd"
+  ),
+  logscore = list(
+    fun = .pointwise_elpd,
+    summary_fun = .elpd_summary,
+    pointwise_col = "elpd",
+    results_col = "elpd"
+  ),
+  mlpd = list(
+    fun = .pointwise_elpd,
+    summary_fun = .mlpd_summary,
+    pointwise_col = "elpd",
+    results_col = "mlpd"
+  ),
+  mae = list(
+    fun = .pointwise_squared_error,
+    summary_fun = .mae_summary,
+    pointwise_col = "squared_error",
+    results_col = "mae"
+  ),
+  r2 = list(
+    fun = .pointwise_squared_error,
+    summary_fun = .r2_summary,
+    pointwise_col = "squared_error",
+    results_col = "r2"
+  ),
+  rmse = list(
+    fun = .pointwise_squared_error,
+    summary_fun = .rmse_summary,
+    pointwise_col = "squared_error",
+    results_col = "rmse"
+  ),
+  mse = list(
+    fun = .pointwise_squared_error,
+    summary_fun = .mse_summary,
+    pointwise_col = "squared_error",
+    results_col = "mse"
+  ),
+  acc = list(
+    fun = .pointwise_accuracy,
+    summary_fun = .accuracy_summary,
+    pointwise_col = "accuracy",
+    results_col = "acc"
+  ),
+  balanced_acc = list(
+    fun = .pointwise_accuracy,
+    summary_fun = .balanced_accuracy_summary,
+    pointwise_col = "accuracy",
+    results_col = "bal_acc"
+  ),
+  rps = list(
+    fun = .pointwise_rps,
+    summary_fun = .rps_summary,
+    pointwise_col = "rps",
+    results_col = "rps"
+  ),
+  crps = list(
+    fun = .pointwise_rps,
+    summary_fun = .rps_summary,
+    pointwise_col = "crps",
+    results_col = "crps"
+  ),
+  srps = list(
+    fun = .pointwise_rps,
+    summary_fun = .srps_summary,
+    pointwise_col = "srps",
+    results_col = "srps"
+  ),
+  scrps = list(
+    fun = .pointwise_rps,
+    summary_fun = .srps_summary,
+    pointwise_col = "scrps",
+    results_col = "scrps"
   )
-}
-
-.standardize_log_weights <- function(log_weights) {
-  sweep(
-    log_weights,
-    2,
-    matrixStats::colLogSumExps(log_weights),
-    FUN = "-",
-    check.margin = FALSE
-  )
-}
+)
+.get_measure_spec <- function(measure) .measure_spec[[measure]]
